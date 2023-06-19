@@ -11,4 +11,4 @@ module purge
 module load Miniconda3/22.11.1-1
 conda activate palm_caption
 
-srun python3 main.py
+srun python3 train.py

@@ -49,8 +49,8 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == '__main__':
-    image_encoder_model = "google/vit-base-patch16-224-in21k"
-    text_decode_model = "gpt2"
+    image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
+    text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
     metric = evaluate.load("rouge")
     ignore_pad_token_for_loss = True
     config_path = "config.json"
