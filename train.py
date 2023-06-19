@@ -1,7 +1,6 @@
 import os
 import torch
 from transformers import VisionEncoderDecoderModel, ViTImageProcessor,AutoTokenizer
-os.environ["WANDB_DISABLED"] = "true"
 import nltk
 import evaluate
 import numpy as np
@@ -26,7 +25,7 @@ def collate_fn(batch):
         model_inputs['labels'].append(obj[1])
         model_inputs['pixel_values'].append(obj[0])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['pixel_values'] = torch.tensor(feature_extractor(model_inputs['pixel_values']).pixel_values)
+    model_inputs['pixel_values'] = torch.tensor(np.stack(feature_extractor(model_inputs['pixel_values']).pixel_values))
     return model_inputs
 
 def postprocess_text(preds, labels):
@@ -115,7 +114,11 @@ if __name__ == '__main__':
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
         output_dir=output_dir,
-        dataloader_num_workers=0
+        dataloader_num_workers=0,
+        logging_strategy='steps',
+        logging_steps=100,
+        # disable_tqdm=True,
+        report_to=['tensorboard']
     )
     trainer = Seq2SeqTrainer(
         model=model,

@@ -6,7 +6,7 @@
 #SBATCH -A lt200060                     # Specify project name
 #SBATCH -J cap_tb                      # Specify job name
 
-#SBATCH --error=error_tb.txt
+#SBATCH --error=output_tb.txt
 #SBATCH --output=output_tb.txt
 
 module purge
@@ -31,4 +31,4 @@ http://localhost:${port}/
 ------------------------------------------------------------------
 "
 
-tensorboard --logdir ./runs --port $port --host $node
+tensorboard --logdir /project/lt200060-capgen/palm/hf-captioning/runs/ --port $port --host $node
