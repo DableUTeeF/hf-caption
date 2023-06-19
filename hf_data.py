@@ -59,7 +59,7 @@ class Flickr8KDataset(Dataset):
         # Create (X, Y) pairs
         self._data = self._create_input_label_mappings(self._data)
 
-        self._dataset_size = len(self._data) if self._training else 0
+        self._dataset_size = len(self._data)
 
     def _construct_image_transform(self, image_size):
         """Constructs the image preprocessing transform object.

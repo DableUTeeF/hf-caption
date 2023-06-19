@@ -9,8 +9,9 @@ from PIL import Image
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from transformers import default_data_collator
 from hf_data import Flickr8KDataset
-from torch.utils.data import DataLoader
+from torch.utils.data import default_collate, DataLoader
 import json
+
 
 def postprocess_text(preds, labels):
     preds = [pred.strip() for pred in preds]
@@ -49,8 +50,12 @@ def compute_metrics(eval_preds):
 
 
 if __name__ == '__main__':
-    image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
-    text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
+    if os.path.exists("/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"):
+        image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
+        text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
+    else:
+        image_encoder_model = "google/vit-base-patch16-224-in21k"
+        text_decode_model = "gpt2"
     metric = evaluate.load("rouge")
     ignore_pad_token_for_loss = True
     config_path = "config.json"
@@ -85,16 +90,18 @@ if __name__ == '__main__':
     }
 
     train_set = Flickr8KDataset(config, config["split_save"]["train"], training=True)
+    print(len(train_set), flush=True)
     valid_set = Flickr8KDataset(config, config["split_save"]["validation"], training=False)
+    print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
-    # valid_loader = DataLoader(valid_set, **train_hyperparams)
+    # valid_loader = DataLoader(valid_set, **valid_hyperparams)
 
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
         evaluation_strategy="epoch",
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
-        output_dir="./image-captioning-output",
+        output_dir="/project/lt200060-capgen/palm/hf-captioning",
     )
     trainer = Seq2SeqTrainer(
         model=model,
@@ -103,6 +110,6 @@ if __name__ == '__main__':
         compute_metrics=compute_metrics,
         train_dataset=train_set,
         eval_dataset=valid_set,
-        data_collator=default_data_collator,
+        # data_collator=default_collate,
     )
     trainer.train()
