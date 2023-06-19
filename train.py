@@ -62,12 +62,12 @@ if __name__ == '__main__':
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/palm/"
-        output_dir="/project/lt200060-capgen/palm/hf-captioning",
+        log_output_dir="/project/lt200060-capgen/palm/hf-captioning/ori"
     else:
         image_encoder_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         src_dir = "/home/palm/data/"
-        output_dir="out",
+        log_output_dir="out"
     metric = evaluate.load("rouge")
     ignore_pad_token_for_loss = True
     config_path = "config.json"
@@ -84,7 +84,7 @@ if __name__ == '__main__':
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
-    output_dir = "vit-gpt-model"
+    output_dir = os.path.join(log_output_dir, "vit-gpt-model")
     model.save_pretrained(output_dir)
     feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
@@ -111,13 +111,14 @@ if __name__ == '__main__':
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
         evaluation_strategy="epoch",
-        per_device_train_batch_size=4,
-        per_device_eval_batch_size=4,
-        output_dir=output_dir,
-        dataloader_num_workers=0,
+        per_device_train_batch_size=72,
+        per_device_eval_batch_size=72,
+        num_train_epochs=12,
+        output_dir=log_output_dir,
+        dataloader_num_workers=1,
         logging_strategy='steps',
         logging_steps=100,
-        # disable_tqdm=True,
+        disable_tqdm=True,
         report_to=['tensorboard']
     )
     trainer = Seq2SeqTrainer(
