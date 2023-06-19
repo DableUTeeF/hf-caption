@@ -8,61 +8,9 @@ import numpy as np
 from PIL import Image
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from transformers import default_data_collator
-
-try:
-    nltk.data.find("tokenizers/punkt")
-except (LookupError, OSError):
-    nltk.download("punkt", quiet=True)
-
-
-def tokenization_fn(captions, max_target_length):
-    """Run tokenization on captions."""
-    labels = tokenizer(captions, 
-                      padding="max_length", 
-                      max_length=max_target_length).input_ids
-
-    return labels
-
-
-def feature_extraction_fn(image_paths, check_image=True):
-    """
-    Run feature extraction on images
-    If `check_image` is `True`, the examples that fails during `Image.open()` will be caught and discarded.
-    Otherwise, an exception will be thrown.
-    """
-
-    model_inputs = {}
-
-    if check_image:
-        images = []
-        to_keep = []
-        for image_file in image_paths:
-            try:
-                img = Image.open(image_file)
-                images.append(img)
-                to_keep.append(True)
-            except Exception:
-                to_keep.append(False)
-    else:
-        images = [Image.open(image_file) for image_file in image_paths]
-
-    encoder_inputs = feature_extractor(images=images, return_tensors="np")
-
-    return encoder_inputs.pixel_values
-
-
-def preprocess_fn(examples, max_target_length, check_image = True):
-    """Run tokenization + image feature extraction"""
-    image_paths = examples['image_path']
-    captions = examples['caption']    
-    
-    model_inputs = {}
-    # This contains image path column
-    model_inputs['labels'] = tokenization_fn(captions, max_target_length)
-    model_inputs['pixel_values'] = feature_extraction_fn(image_paths, check_image=check_image)
-
-    return model_inputs
-
+from hf_data import Flickr8KDataset
+from torch.utils.data import DataLoader
+import json
 
 def postprocess_text(preds, labels):
     preds = [pred.strip() for pred in preds]
@@ -105,6 +53,9 @@ if __name__ == '__main__':
     text_decode_model = "gpt2"
     metric = evaluate.load("rouge")
     ignore_pad_token_for_loss = True
+    config_path = "config.json"
+    with open(config_path, "r", encoding="utf8") as f:
+        config = json.load(f)
 
     model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(image_encoder_model, text_decode_model)
     feature_extractor = AutoFeatureExtractor.from_pretrained(image_encoder_model)
@@ -120,15 +71,23 @@ if __name__ == '__main__':
     model.save_pretrained(output_dir)
     feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
+    train_hyperparams = {
+        "batch_size": config["batch_size"]["train"],
+        "shuffle": True,
+        "num_workers": 1,
+        "drop_last": True
+    }
+    valid_hyperparams = {
+        "batch_size": config["batch_size"]["eval"],
+        "shuffle": False,
+        "num_workers": 1,
+        "drop_last": True
+    }
 
-    ds = datasets.load_dataset("ydshieh/coco_dataset_script", "2017", data_dir="./dummy_data/")
-
-    processed_dataset = ds.map(
-        function=preprocess_fn,
-        batched=True,
-        fn_kwargs={"max_target_length": 128},
-        remove_columns=ds['train'].column_names
-    )
+    train_set = Flickr8KDataset(config, config["split_save"]["train"], training=True)
+    valid_set = Flickr8KDataset(config, config["split_save"]["validation"], training=False)
+    # train_loader = DataLoader(train_set, **train_hyperparams)
+    # valid_loader = DataLoader(valid_set, **train_hyperparams)
 
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
@@ -142,8 +101,8 @@ if __name__ == '__main__':
         tokenizer=feature_extractor,
         args=training_args,
         compute_metrics=compute_metrics,
-        train_dataset=processed_dataset['train'],
-        eval_dataset=processed_dataset['validation'],
+        train_dataset=train_set,
+        eval_dataset=valid_set,
         data_collator=default_data_collator,
     )
     trainer.train()
