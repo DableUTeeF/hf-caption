@@ -1,33 +1,29 @@
 {
-    "dataset_dir": "/project/lt200060-capgen/palm/flickr8k",
-    "glove_dir": "/project/lt200060-capgen/palm/glove_embeddings",
-    "dataset_path": "/project/lt200060-capgen/palm/flickr8k/captions.txt",
-    "feature_cache_dir": "/project/lt200060-capgen/palm/imagecaptioning/features",
+    "dataset_dir": "flickr8k",
+    "glove_dir": "glove_embeddings",
+    "dataset_path": "flickr8k/captions.txt",
+    "feature_cache_dir": "imagecaptioning/features",
 
     "split_images": {
-        "train": "/project/lt200060-capgen/palm/flickr8k/Flickr_8k.trainImages.txt",
-        "validation": "/project/lt200060-capgen/palm/flickr8k/Flickr_8k.devImages.txt",
-        "test": "/project/lt200060-capgen/palm/flickr8k/Flickr_8k.testImages.txt"
+        "train": "flickr8k/Flickr_8k.trainImages.txt",
+        "validation": "flickr8k/Flickr_8k.devImages.txt",
+        "test": "flickr8k/Flickr_8k.testImages.txt"
     },
     
     "split_save": {
-        "train": "/project/lt200060-capgen/palm/flickr8k/train.txt",
-        "validation": "/project/lt200060-capgen/palm/flickr8k/validation.txt",
-        "test": "/project/lt200060-capgen/palm/flickr8k/test.txt"
+        "train": "flickr8k/train.txt",
+        "validation": "flickr8k/validation.txt",
+        "test": "flickr8k/test.txt"
     },
 
-    "word2idx_path": "/project/lt200060-capgen/palm/flickr8k/dataset/word2idx.json",
+    "word2idx_path": "flickr8k/dataset/word2idx.json",
     "embeddings": {
-        "path": "/project/lt200060-capgen/palm/flickr8k/dataset/embeddings.txt",
+        "path": "flickr8k/dataset/embeddings.txt",
         "size": 100
     },
 
     "image_specs": {
-        "image_dir": {
-            "train": "/project/lt200060-capgen/palm/flickr8k/Images",
-            "validation": "/project/lt200060-capgen/palm/flickr8k/Images",
-            "test": "/project/lt200060-capgen/palm/flickr8k/Images"
-        },
+        "image_dir": "flickr8k/Images",
         "img_feature_channels": 256,
         "image_size": 256
     },
@@ -82,6 +78,6 @@
 
     "checkpoint": {
         "load": false,
-        "checkpoint_path": "/project/lt200060-capgen/palm/imagecaptioning"
+        "checkpoint_path": "imagecaptioning"
     }
 }

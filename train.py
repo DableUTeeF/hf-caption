@@ -1,6 +1,6 @@
 import os
-import datasets
-from transformers import VisionEncoderDecoderModel, AutoFeatureExtractor,AutoTokenizer
+import torch
+from transformers import VisionEncoderDecoderModel, ViTImageProcessor,AutoTokenizer
 os.environ["WANDB_DISABLED"] = "true"
 import nltk
 import evaluate
@@ -13,16 +13,29 @@ from torch.utils.data import default_collate, DataLoader
 import json
 
 
+def tokenization_fn(captions, max_target_length=128):
+    labels = tokenizer(captions, 
+                      padding="max_length", 
+                      max_length=max_target_length,
+                      return_tensors='pt').input_ids
+    return labels
+
+def collate_fn(batch):
+    model_inputs = {'labels': [], 'pixel_values': []}
+    for obj in batch:
+        model_inputs['labels'].append(obj[1])
+        model_inputs['pixel_values'].append(obj[0])
+    model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
+    model_inputs['pixel_values'] = torch.tensor(feature_extractor(model_inputs['pixel_values']).pixel_values)
+    return model_inputs
+
 def postprocess_text(preds, labels):
     preds = [pred.strip() for pred in preds]
     labels = [label.strip() for label in labels]
-
     # rougeLSum expects newline after each sentence
     preds = ["\n".join(nltk.sent_tokenize(pred)) for pred in preds]
     labels = ["\n".join(nltk.sent_tokenize(label)) for label in labels]
-
     return preds, labels
-
 
 def compute_metrics(eval_preds):
     preds, labels = eval_preds
@@ -33,18 +46,14 @@ def compute_metrics(eval_preds):
         # Replace -100 in the labels as we can't decode them.
         labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
     decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-
     # Some simple post-processing
     decoded_preds, decoded_labels = postprocess_text(decoded_preds,
                                                      decoded_labels)
-
     result = metric.compute(predictions=decoded_preds,
                             references=decoded_labels,
                             use_stemmer=True)
     result = {k: round(v * 100, 4) for k, v in result.items()}
-    prediction_lens = [
-        np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds
-    ]
+    prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     return result
 
@@ -53,9 +62,13 @@ if __name__ == '__main__':
     if os.path.exists("/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"):
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
+        src_dir = "/project/lt200060-capgen/palm/"
+        output_dir="/project/lt200060-capgen/palm/hf-captioning",
     else:
         image_encoder_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
+        src_dir = "/home/palm/data/"
+        output_dir="out",
     metric = evaluate.load("rouge")
     ignore_pad_token_for_loss = True
     config_path = "config.json"
@@ -63,7 +76,7 @@ if __name__ == '__main__':
         config = json.load(f)
 
     model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(image_encoder_model, text_decode_model)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(image_encoder_model)
+    feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     # GPT2 only has bos/eos tokens but not decoder_start/pad tokens
     tokenizer.pad_token = tokenizer.eos_token
@@ -89,9 +102,9 @@ if __name__ == '__main__':
         "drop_last": True
     }
 
-    train_set = Flickr8KDataset(config, config["split_save"]["train"], training=True)
+    train_set = Flickr8KDataset(config, src_dir, training=True)
     print(len(train_set), flush=True)
-    valid_set = Flickr8KDataset(config, config["split_save"]["validation"], training=False)
+    valid_set = Flickr8KDataset(config, src_dir, training=False)
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
     # valid_loader = DataLoader(valid_set, **valid_hyperparams)
@@ -101,7 +114,8 @@ if __name__ == '__main__':
         evaluation_strategy="epoch",
         per_device_train_batch_size=4,
         per_device_eval_batch_size=4,
-        output_dir="/project/lt200060-capgen/palm/hf-captioning",
+        output_dir=output_dir,
+        dataloader_num_workers=0
     )
     trainer = Seq2SeqTrainer(
         model=model,
@@ -110,6 +124,6 @@ if __name__ == '__main__':
         compute_metrics=compute_metrics,
         train_dataset=train_set,
         eval_dataset=valid_set,
-        # data_collator=default_collate,
+        data_collator=collate_fn,
     )
     trainer.train()
