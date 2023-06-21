@@ -8,20 +8,8 @@ from PIL import Image
 
 
 class Flickr8KDataset(Dataset):
-    """"Represents dataloader for the Flickr8k dataset.
-
-    Data is stored in following format:
-        image_name: associated caption
-    Each image has maximum 5 different captions.
-    """
-
     def __init__(self, config, src_dir, training=True):
-        """Initializes the module.
-        
-        Arguments:
-            config (object): Contains dataset configuration
-            path (str): Location where image captions are stored
-        """
+
         self.src_dir = src_dir
         if training:
             path = config["split_save"]["train"]
@@ -33,14 +21,6 @@ class Flickr8KDataset(Dataset):
         self._image_specs = config["image_specs"]["image_dir"]
 
     def _create_input_label_mappings(self, data):
-        """Creates (image, description) pairs.
-
-        Arguments:
-            data (list of str): Each element consists out of image file name and appropriate caption
-                Elements are organized in the following format: 'image_name[SPACE]caption'
-        Returns:
-            processed_data (list of tuples): Each tuple is organized in following format: (image_name, caption)
-        """
         processed_data = []
         for line in data:
             tokens = line.split()
@@ -57,4 +37,4 @@ class Flickr8KDataset(Dataset):
 
     def __getitem__(self, index):
         image, caption = self._data[index]
-        return Image.open(os.path.join(self.src_dir, self._image_specs, image)), caption
+        return os.path.join(self.src_dir, self._image_specs, image), caption
