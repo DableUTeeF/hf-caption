@@ -21,11 +21,11 @@ def tokenization_fn(captions, max_target_length=128):
 
 
 def collate_fn(batch):
-    model_inputs = {'labels': [], 'pixel_values': []}
+    model_inputs = {'labels': [], 'encoder_outputs': []}
     for obj in batch:
         model_inputs['labels'].append(obj[1])
         image = obj[0]
-        data = torch.load(os.path.join(feature_dir, os.path.basename(image)+'.pth'))
+        data = torch.load(os.path.join(feature_dir, os.path.basename(image)+'.pth'), map_location='cpu')
         reg = data['reg']
         cls_score = data['cls']
         scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
