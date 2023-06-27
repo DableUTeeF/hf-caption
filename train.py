@@ -1,14 +1,14 @@
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = ''
 import torch
-from transformers import ViTImageProcessor, AutoTokenizer
+from transformers import ViTImageProcessor, AutoTokenizer, AutoModelForCausalLM
 import nltk
 import evaluate
 import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import Flickr8KDataset
 import json
-from models import CachedFeatureDecoderModel
+from models import CachedFeatureDecoderModel, DINOPretrained
 from torch.nn import functional as F
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -22,26 +22,16 @@ def tokenization_fn(captions, max_target_length=128):
 
 
 def collate_fn(batch):
-    model_inputs = {'labels': [], 'encoder_outputs': []}
+    model_inputs = {'labels': [], 'hook': []}
     for obj in batch:
         model_inputs['labels'].append(obj[1])
         image = obj[0]
-        data = torch.load(os.path.join(feature_dir, os.path.basename(image)+'.pth'), map_location='cpu')
-        reg = data['reg']
-        cls_score = data['cls']
-        scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
-        scores, bbox_index = scores.topk(3)
-        output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256)).view(1, 768)
-        model_inputs['encoder_outputs'].append(output)
+        data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
+        data.pop('cls_features_6')
+        data.pop('reg_features_6')
+        model_inputs['hook'].append(data)
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['encoder_outputs'] = torch.cat(model_inputs['encoder_outputs'], 0)
-    model_inputs['encoder_outputs'] = model_inputs['encoder_outputs'].unsqueeze(1)
-    model_inputs['encoder_outputs'] = BaseModelOutput(
-        last_hidden_state=model_inputs['encoder_outputs'],
-        hidden_states=model_inputs['encoder_outputs'],
-        attentions=torch.zeros_like(model_inputs['encoder_outputs']),
-    )
-    # print(model_inputs['encoder_outputs'].size())
+    model_inputs['hook'] = torch.cat(model_inputs['hook'])
     return model_inputs
 
 
@@ -77,13 +67,13 @@ def compute_metrics(eval_preds):
 
 if __name__ == '__main__':
     max_per_img = 50
-    
+
     if os.path.exists("/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"):
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/palm/"
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/ori"
-        feature_dir='/project/lt200060-capgen/palm/imagecaptioning/features'
+        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features2/dino'
         bs = 72
     elif os.path.exists("/media/palm/Data/capgen/"):
         image_encoder_model = "google/vit-base-patch16-224-in21k"
@@ -103,7 +93,10 @@ if __name__ == '__main__':
     with open(config_path, "r", encoding="utf8") as f:
         config = json.load(f)
 
-    model = CachedFeatureDecoderModel.from_encoder_decoder_pretrained(image_encoder_model, text_decode_model)
+    model = CachedFeatureDecoderModel(
+        DINOPretrained(),
+        AutoModelForCausalLM.from_pretrained(text_decode_model)
+    )
     feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     # GPT2 only has bos/eos tokens but not decoder_start/pad tokens
@@ -113,7 +106,7 @@ if __name__ == '__main__':
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
-    output_dir = os.path.join(log_output_dir, "vit-gpt-model")
+    output_dir = os.path.join(log_output_dir, "DINOPretrained")
     model.save_pretrained(output_dir)
     feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)

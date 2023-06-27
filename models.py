@@ -1,11 +1,47 @@
 from transformers import VisionEncoderDecoderModel
-from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss, Seq2SeqLMOutput
+from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss
+from torch import nn
+from transformers.modeling_utils import PreTrainedModel
+from transformers.modeling_outputs import BaseModelOutputWithPooling, Seq2SeqLMOutput
+from torch.nn import functional as F
 import torch
+
+class DINOPretrained(PreTrainedModel):
+    def __init__(
+            self,
+            config=None,
+    ):
+        super().__init__(config)
+        self.output_adapter = nn.Linear(256, 768)
+        self.act = nn.GELU()
+        self.max_per_img = 50
+
+    def forward(
+            self,
+            hook,
+    ):
+        feats = []
+        for i in range(6):
+            reg = hook[f'reg_features_{i}']
+            cls_score = hook[f'cls_features_{i}']
+            scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
+            scores, bbox_index = scores.topk(self.max_per_img)
+            output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256)).permute(0, 2, 1)
+            output = self.act(self.output_adapter(output))
+            feats.append(output)
+        feats = torch.cat(feats, 0)
+        return BaseModelOutputWithPooling(
+            last_hidden_state=output,
+            pooler_output=None,
+            hidden_states=feats,
+            attentions=torch.ones_like(feats),
+        )
+
 
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
             self,
-            pixel_values=None,
+            hook=None,
             decoder_input_ids=None,
             decoder_attention_mask=None,
             encoder_outputs=None,
@@ -21,14 +57,16 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
         kwargs_decoder = {
-            argument[len("decoder_") :]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
+            argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
+        if encoder_outputs is None:
+            encoder_outputs = self.encoder(hook)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
         if (
-            self.encoder.config.hidden_size != self.decoder.config.hidden_size
-            and self.decoder.config.cross_attention_hidden_size is None
+                self.encoder.config.hidden_size != self.decoder.config.hidden_size
+                and self.decoder.config.cross_attention_hidden_size is None
         ):
             encoder_hidden_states = self.enc_to_dec_proj(encoder_hidden_states)
 
@@ -79,4 +117,3 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
-
