@@ -11,4 +11,7 @@ module purge
 module load Miniconda3/22.11.1-1
 conda activate /project/lt200060-capgen/palm/conda_envs/.conda/envs/palm_caption
 
+export _TYPER_STANDARD_TRACEBACK=1
+export TYPER_STANDARD_TRACEBACK=1
+
 srun python3 train.py

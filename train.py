@@ -10,6 +10,7 @@ from hf_data import Flickr8KDataset
 import json
 from models import CachedFeatureDecoderModel
 from torch.nn import functional as F
+from transformers.modeling_outputs import BaseModelOutput
 
 
 def tokenization_fn(captions, max_target_length=128):
@@ -34,6 +35,13 @@ def collate_fn(batch):
         model_inputs['encoder_outputs'].append(output)
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
     model_inputs['encoder_outputs'] = torch.cat(model_inputs['encoder_outputs'], 0)
+    model_inputs['encoder_outputs'] = model_inputs['encoder_outputs'].unsqueeze(1)
+    model_inputs['encoder_outputs'] = BaseModelOutput(
+        last_hidden_state=model_inputs['encoder_outputs'],
+        hidden_states=model_inputs['encoder_outputs'],
+        attentions=torch.zeros_like(model_inputs['encoder_outputs']),
+    )
+    # print(model_inputs['encoder_outputs'].size())
     return model_inputs
 
 

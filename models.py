@@ -1,6 +1,6 @@
 from transformers import VisionEncoderDecoderModel
 from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss, Seq2SeqLMOutput
-
+import torch
 
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
@@ -23,7 +23,6 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
         kwargs_decoder = {
             argument[len("decoder_") :]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
-
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
