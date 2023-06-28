@@ -22,16 +22,17 @@ def tokenization_fn(captions, max_target_length=128):
 
 
 def collate_fn(batch):
-    model_inputs = {'labels': [], 'hook': []}
+    model_inputs = {'labels': [], 'cls_features': [], 'reg_features': []}
     for obj in batch:
         model_inputs['labels'].append(obj[1])
         image = obj[0]
         data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
-        data.pop('cls_features_6')
-        data.pop('reg_features_6')
-        model_inputs['hook'].append(data)
+        for i in range(6):
+            model_inputs['cls_features'].append(data[f'cls_features_{i}'])
+            model_inputs['reg_features'].append(data[f'reg_features_{i}'])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['hook'] = torch.cat(model_inputs['hook'])
+    model_inputs['cls_features'] = torch.stack(model_inputs['cls_features_'])
+    model_inputs['reg_features'] = torch.stack(model_inputs['reg_features'])
     return model_inputs
 
 

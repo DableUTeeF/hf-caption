@@ -50,7 +50,7 @@ class DINOConfig(PretrainedConfig):
 class DINOPretrained(PreTrainedModel):
     config_class = DINOConfig
     base_model_prefix = "dino"
-    main_input_name = "hook"
+    main_input_name = "reg_features"
     supports_gradient_checkpointing = False
     _no_split_modules = []
 
@@ -64,12 +64,13 @@ class DINOPretrained(PreTrainedModel):
 
     def forward(
             self,
-            hook,
+            reg_features,
+            cls_features,
     ):
         feats = []
         for i in range(6):
-            reg = hook[f'reg_features_{i}']
-            cls_score = hook[f'cls_features_{i}']
+            reg = reg_features[i]
+            cls_score = cls_features[i]
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(self.max_per_img)
             output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256)).permute(0, 2, 1)
@@ -94,7 +95,8 @@ class CachedFeatureConfig(VisionEncoderDecoderConfig):
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
             self,
-            hook=None,
+            reg_features=None,
+            cls_features=None,
             decoder_input_ids=None,
             decoder_attention_mask=None,
             encoder_outputs=None,
@@ -113,7 +115,7 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
         if encoder_outputs is None:
-            encoder_outputs = self.encoder(hook)
+            encoder_outputs = self.encoder(reg_features, cls_features)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
