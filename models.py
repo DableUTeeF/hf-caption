@@ -57,7 +57,6 @@ class DINOPretrained(PreTrainedModel):
     def __init__(
             self,
             config=None,
-            return_dict=None,
             **kwargs
     ):
         super().__init__(config)
@@ -68,6 +67,7 @@ class DINOPretrained(PreTrainedModel):
             self,
             reg_features,
             cls_features,
+            **kwargs
     ):
         feats = []
         for i in range(6):
