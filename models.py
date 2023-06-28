@@ -73,7 +73,7 @@ class DINOPretrained(PreTrainedModel):
             cls_score = cls_features[i]
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(self.max_per_img)
-            output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256)).permute(0, 2, 1)
+            output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
             # output = self.act(self.output_adapter(output))
             feats.append(output)
         feats = torch.cat(feats, 0)
