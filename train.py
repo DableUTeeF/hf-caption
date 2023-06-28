@@ -8,7 +8,7 @@ import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import Flickr8KDataset
 import json
-from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig, CachedFeatureConfig
+from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig
 from torch.nn import functional as F
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -92,11 +92,11 @@ if __name__ == '__main__':
     config_path = "config.json"
     with open(config_path, "r", encoding="utf8") as f:
         config = json.load(f)
-    decoder = AutoModelForCausalLM.from_pretrained(text_decode_model)
+
     model = CachedFeatureDecoderModel(
-        CachedFeatureConfig(decoder.config),
+        None,
         DINOPretrained(DINOConfig()),
-        decoder
+        AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)

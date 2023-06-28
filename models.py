@@ -1,4 +1,4 @@
-from transformers import VisionEncoderDecoderModel, AutoConfig
+from transformers import VisionEncoderDecoderModel, AutoConfig, AutoModel
 from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss, VisionEncoderDecoderConfig
 from torch import nn
 from transformers.modeling_utils import PreTrainedModel
@@ -170,3 +170,6 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+
+AutoConfig.register("dino", DINOConfig)
+AutoModel.register(DINOConfig, DINOPretrained)
