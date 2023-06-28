@@ -31,7 +31,7 @@ def collate_fn(batch):
             model_inputs['cls_features'].append(data[f'cls_features_{i}'])
             model_inputs['reg_features'].append(data[f'reg_features_{i}'])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['cls_features'] = torch.stack(model_inputs['cls_features_'])
+    model_inputs['cls_features'] = torch.stack(model_inputs['cls_features'])
     model_inputs['reg_features'] = torch.stack(model_inputs['reg_features'])
     return model_inputs
 
