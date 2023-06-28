@@ -93,7 +93,8 @@ if __name__ == '__main__':
     with open(config_path, "r", encoding="utf8") as f:
         config = json.load(f)
 
-    model = CachedFeatureDecoderModel.from_encoder_decoder_pretrained(
+    model = CachedFeatureDecoderModel(
+        None,
         DINOPretrained(DINOConfig()),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
