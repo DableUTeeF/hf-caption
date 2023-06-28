@@ -57,6 +57,7 @@ class DINOPretrained(PreTrainedModel):
     def __init__(
             self,
             config=None,
+            **kwargs
     ):
         super().__init__(config)
         self.act = nn.GELU()
