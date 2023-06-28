@@ -1,5 +1,5 @@
-from transformers import VisionEncoderDecoderModel
-from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss
+from transformers import VisionEncoderDecoderModel, AutoConfig
+from transformers.models.vision_encoder_decoder.modeling_vision_encoder_decoder import shift_tokens_right, CrossEntropyLoss, VisionEncoderDecoderConfig
 from torch import nn
 from transformers.modeling_utils import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling, Seq2SeqLMOutput
@@ -82,6 +82,18 @@ class DINOPretrained(PreTrainedModel):
             hidden_states=feats,
             attentions=torch.ones_like(feats),
         )
+
+
+class CachedFeatureConfig(VisionEncoderDecoderConfig):
+    def __init__(self, **kwargs):
+        encoder_config = kwargs.pop("encoder")
+        encoder_model_type = encoder_config.pop("model_type")
+        decoder_config = kwargs.pop("decoder")
+        decoder_model_type = decoder_config.pop("model_type")
+
+        self.encoder = DINOConfig()
+        self.decoder = AutoConfig.for_model(decoder_model_type, **decoder_config)
+        self.is_encoder_decoder = True
 
 
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
