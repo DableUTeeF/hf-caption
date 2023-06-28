@@ -85,14 +85,9 @@ class DINOPretrained(PreTrainedModel):
 
 
 class CachedFeatureConfig(VisionEncoderDecoderConfig):
-    def __init__(self, **kwargs):
-        encoder_config = kwargs.pop("encoder")
-        encoder_model_type = encoder_config.pop("model_type")
-        decoder_config = kwargs.pop("decoder")
-        decoder_model_type = decoder_config.pop("model_type")
-
+    def __init__(self, decoder_cfg):
         self.encoder = DINOConfig()
-        self.decoder = AutoConfig.for_model(decoder_model_type, **decoder_config)
+        self.decoder = decoder_cfg
         self.is_encoder_decoder = True
 
 
