@@ -5,14 +5,60 @@ from transformers.modeling_utils import PreTrainedModel
 from transformers.modeling_outputs import BaseModelOutputWithPooling, Seq2SeqLMOutput
 from torch.nn import functional as F
 import torch
+from transformers.configuration_utils import PretrainedConfig
+
+
+class DINOConfig(PretrainedConfig):
+    model_type = "dino"
+
+    def __init__(
+        self,
+        hidden_size=256,
+        num_hidden_layers=12,
+        num_attention_heads=12,
+        intermediate_size=3072,
+        hidden_act="gelu",
+        hidden_dropout_prob=0.0,
+        attention_probs_dropout_prob=0.0,
+        initializer_range=0.02,
+        layer_norm_eps=1e-12,
+        image_size=224,
+        patch_size=16,
+        num_channels=3,
+        qkv_bias=True,
+        encoder_stride=16,
+        **kwargs,
+    ):
+        super().__init__(**kwargs)
+
+        self.hidden_size = hidden_size
+        self.num_hidden_layers = num_hidden_layers
+        self.num_attention_heads = num_attention_heads
+        self.intermediate_size = intermediate_size
+        self.hidden_act = hidden_act
+        self.hidden_dropout_prob = hidden_dropout_prob
+        self.attention_probs_dropout_prob = attention_probs_dropout_prob
+        self.initializer_range = initializer_range
+        self.layer_norm_eps = layer_norm_eps
+        self.image_size = image_size
+        self.patch_size = patch_size
+        self.num_channels = num_channels
+        self.qkv_bias = qkv_bias
+        self.encoder_stride = encoder_stride
+
 
 class DINOPretrained(PreTrainedModel):
+    config_class = DINOConfig
+    base_model_prefix = "dino"
+    main_input_name = "hook"
+    supports_gradient_checkpointing = False
+    _no_split_modules = []
+
     def __init__(
             self,
             config=None,
     ):
         super().__init__(config)
-        self.output_adapter = nn.Linear(256, 768)
         self.act = nn.GELU()
         self.max_per_img = 50
 
@@ -27,7 +73,7 @@ class DINOPretrained(PreTrainedModel):
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(self.max_per_img)
             output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256)).permute(0, 2, 1)
-            output = self.act(self.output_adapter(output))
+            # output = self.act(self.output_adapter(output))
             feats.append(output)
         feats = torch.cat(feats, 0)
         return BaseModelOutputWithPooling(
