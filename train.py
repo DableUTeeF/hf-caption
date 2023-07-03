@@ -27,9 +27,13 @@ def collate_fn(batch):
         model_inputs['labels'].append(obj[1])
         image = obj[0]
         data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
+        reg_features = []
+        cls_features = []
         for i in range(6):
-            model_inputs['cls_features'].append(data[f'cls_features_{i}'])
-            model_inputs['reg_features'].append(data[f'reg_features_{i}'])
+            reg_features.append(data[f'reg_features_{i}'])
+            cls_features.append(data[f'cls_features_{i}'])
+        model_inputs['cls_features'].append(torch.cat(cls_features))
+        model_inputs['reg_features'].append(torch.cat(reg_features))
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
     model_inputs['cls_features'] = torch.stack(model_inputs['cls_features'])
     model_inputs['reg_features'] = torch.stack(model_inputs['reg_features'])
@@ -73,7 +77,7 @@ if __name__ == '__main__':
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/palm/"
-        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/ori"
+        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-vit-120"
         feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features2/dino'
         bs = 72
     elif os.path.exists("/media/palm/Data/capgen/"):

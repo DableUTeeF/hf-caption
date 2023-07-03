@@ -6,16 +6,16 @@ from transformers.modeling_outputs import BaseModelOutputWithPooling, Seq2SeqLMO
 from torch.nn import functional as F
 import torch
 from transformers.configuration_utils import PretrainedConfig
+from transformers.models.vit.modeling_vit import ViTEmbeddings, ViTEncoder, ViTPooler, ViTConfig
 
-
-class DINOConfig(PretrainedConfig):
+class DINOConfig(ViTConfig):
     model_type = "dino"
 
     def __init__(
         self,
         hidden_size=256,
-        num_hidden_layers=12,
-        num_attention_heads=12,
+        num_hidden_layers=8,
+        num_attention_heads=8,
         intermediate_size=3072,
         hidden_act="gelu",
         hidden_dropout_prob=0.0,
@@ -62,28 +62,58 @@ class DINOPretrained(PreTrainedModel):
         super().__init__(config)
         self.act = nn.GELU()
         self.max_per_img = 50
+        self.embeddings = ViTEmbeddings(config, use_mask_token=False)
+        self.encoder = ViTEncoder(config)
+
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pooler = ViTPooler(config)
+        self.post_init()
 
     def forward(
             self,
             reg_features,
             cls_features,
+            return_dict=None,
+            output_attentions=None,
+            output_hidden_states=None,
             **kwargs
     ):
         feats = []
         for i in range(6):
-            reg = reg_features[i]
-            cls_score = cls_features[i]
+            reg = reg_features[:, i]
+            cls_score = cls_features[:, i]
             scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
             scores, bbox_index = scores.topk(self.max_per_img)
             output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
-            # output = self.act(self.output_adapter(output))
             feats.append(output)
-        feats = torch.cat(feats, 0)
+        embedding_output = torch.cat(feats, 1)
+
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        head_mask = self.get_head_mask(None, self.config.num_hidden_layers)
+        encoder_outputs = self.encoder(
+            embedding_output,
+            head_mask=head_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = encoder_outputs[0]
+        sequence_output = self.layernorm(sequence_output)
+        pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
+
+        if not return_dict:
+            head_outputs = (sequence_output, pooled_output) if pooled_output is not None else (sequence_output,)
+            return head_outputs + encoder_outputs[1:]
+
         return BaseModelOutputWithPooling(
-            last_hidden_state=output,
-            pooler_output=None,
-            hidden_states=feats,
-            attentions=torch.ones_like(feats),
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions,
         )
 
 
