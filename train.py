@@ -8,7 +8,7 @@ import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import Flickr8KDataset
 import json
-from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig
+from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig, RCNNConfig, RCNNPretrained
 from torch.nn import functional as F
 from transformers.modeling_outputs import BaseModelOutput
 
@@ -24,12 +24,13 @@ def tokenization_fn(captions, max_target_length=128):
 def collate_fn(batch):
     model_inputs = {'labels': [], 'features': []}
     for obj in batch:
-        model_inputs['labels'].append(obj[1])
         image = obj[0]
         data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
-        model_inputs['features'].append(data[f'features[5]'])
+        if data[f'features'].size(0) == 1000:
+            model_inputs['features'].append(data[f'features'])
+            model_inputs['labels'].append(obj[1])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['features'] = torch.cat(model_inputs['features'])
+    model_inputs['features'] = torch.stack(model_inputs['features'])
     return model_inputs
 
 
@@ -70,8 +71,8 @@ if __name__ == '__main__':
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/palm/"
-        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
-        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features3/dino'
+        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/rcnn"
+        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features3/rcnn'
         bs = 16
     elif os.path.exists("/media/palm/Data/capgen/"):
         image_encoder_model = "google/vit-base-patch16-224-in21k"
@@ -93,7 +94,7 @@ if __name__ == '__main__':
 
     model = CachedFeatureDecoderModel(
         None,
-        DINOPretrained(DINOConfig()),
+        RCNNPretrained(RCNNConfig()),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
@@ -105,7 +106,7 @@ if __name__ == '__main__':
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
-    output_dir = os.path.join(log_output_dir, "DINOPretrained")
+    output_dir = os.path.join(log_output_dir, "RCNNPretrained")
     model.save_pretrained(output_dir)
     feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
