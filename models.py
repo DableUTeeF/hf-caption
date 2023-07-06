@@ -50,7 +50,7 @@ class DINOConfig(ViTConfig):
 class DINOPretrained(PreTrainedModel):
     config_class = DINOConfig
     base_model_prefix = "dino"
-    main_input_name = "reg_features"
+    main_input_name = "features"
     supports_gradient_checkpointing = False
     _no_split_modules = []
 
@@ -71,23 +71,12 @@ class DINOPretrained(PreTrainedModel):
 
     def forward(
             self,
-            reg_features,
-            cls_features,
+            features,
             return_dict=None,
             output_attentions=None,
             output_hidden_states=None,
             **kwargs
     ):
-        feats = []
-        for i in range(6):
-            reg = reg_features[:, i]
-            cls_score = cls_features[:, i]
-            scores, det_labels = F.softmax(cls_score, dim=-1)[..., :-1].max(-1)
-            scores, bbox_index = scores.topk(self.max_per_img)
-            output = torch.gather(reg, 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
-            feats.append(output)
-        embedding_output = torch.cat(feats, 1)
-
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
@@ -95,7 +84,7 @@ class DINOPretrained(PreTrainedModel):
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
         head_mask = self.get_head_mask(None, self.config.num_hidden_layers)
         encoder_outputs = self.encoder(
-            embedding_output,
+            features,
             head_mask=head_mask,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
@@ -127,8 +116,7 @@ class CachedFeatureConfig(VisionEncoderDecoderConfig):
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
             self,
-            reg_features=None,
-            cls_features=None,
+            features=None,
             decoder_input_ids=None,
             decoder_attention_mask=None,
             encoder_outputs=None,
@@ -147,7 +135,7 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
         if encoder_outputs is None:
-            encoder_outputs = self.encoder(reg_features, cls_features)
+            encoder_outputs = self.encoder(features)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
