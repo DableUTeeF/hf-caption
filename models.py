@@ -110,7 +110,7 @@ class RCNNConfig(DINOConfig):
     def __init__(
         self,
         hidden_size=1024,
-        num_hidden_layers=2,
+        num_hidden_layers=8,
         num_attention_heads=2,
         intermediate_size=3072,
         hidden_act="gelu",
@@ -145,10 +145,26 @@ class RCNNConfig(DINOConfig):
 
 class RCNNPretrained(DINOPretrained):
     config_class = RCNNConfig
-    base_model_prefix = "dino"
+    base_model_prefix = "rcnn"
     main_input_name = "features"
     supports_gradient_checkpointing = False
     _no_split_modules = []
+    def forward(
+            self,
+            features,
+            return_dict=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            **kwargs
+    ):
+        # print(features.size(), flush=True)
+        feats = features.unsqueeze(1)
+        return BaseModelOutputWithPooling(
+            last_hidden_state=features,
+            pooler_output=None,
+            hidden_states=feats,
+            attentions=torch.ones_like(feats),
+        )
 
 
 class CachedFeatureConfig(VisionEncoderDecoderConfig):
