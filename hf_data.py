@@ -7,6 +7,42 @@ from torch.utils.data import Dataset
 from PIL import Image
 
 
+class COCOData(Dataset):
+    def __init__(self, json_file, src_dir, training=True, transform=True):
+        json_file = json.load(open(json_file))
+        self.captions = json_file['annotations']
+        self.images = {}
+        for image in json_file['images']:
+            self.images[image['id']] = image
+        self.src_dir = src_dir
+        if training and transform:
+            self.transform = transforms.Compose([
+                transforms.RandomResizedCrop(224),
+                transforms.RandomHorizontalFlip(0.5),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+        elif transform:
+            self.transform = transforms.Compose([
+                transforms.Resize(224),
+                transforms.CenterCrop(224),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+            ])
+        else:
+            self.transform = lambda x: x
+
+    def __len__(self):
+        return len(self.captions)
+
+    def __getitem__(self, index):
+        caption = self.captions[index]
+        image = self.images[caption['image_id']]
+        image = Image.open(os.path.join(self.src_dir, image['file_name']))
+        image = self.transform(image)
+        return image, caption['caption']
+
+
 class Flickr8KDataset(Dataset):
     def __init__(self, config, src_dir, training=True):
 
