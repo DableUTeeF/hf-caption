@@ -26,11 +26,11 @@ def collate_fn(batch):
     for obj in batch:
         image = obj[0]
         data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
-        if data[f'features'].size(0) == 1000:
-            model_inputs['features'].append(data[f'features'])
-            model_inputs['labels'].append(obj[1])
+        # if data[f'features'].size(0) == 1000:
+        model_inputs['features'].append(data[f'last_hidden_state'])
+        model_inputs['labels'].append(obj[1])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['features'] = torch.stack(model_inputs['features'])
+    model_inputs['features'] = torch.cat(model_inputs['features'])
     return model_inputs
 
 
@@ -71,8 +71,8 @@ if __name__ == '__main__':
         image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/palm/"
-        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/rcnn"
-        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features3/rcnn'
+        log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/vit"
+        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features3/vit'
         bs = 16
     elif os.path.exists("/media/palm/Data/capgen/"):
         image_encoder_model = "google/vit-base-patch16-224-in21k"
@@ -94,7 +94,7 @@ if __name__ == '__main__':
 
     model = CachedFeatureDecoderModel(
         None,
-        RCNNPretrained(RCNNConfig()),
+        DINOPretrained(DINOConfig(hidden_size=768)),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
