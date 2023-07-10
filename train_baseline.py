@@ -34,7 +34,7 @@ def feature_extraction_fn(image_paths, check_image=True):
         to_keep = []
         for image_file in image_paths:
             try:
-                img = Image.open(image_file)
+                img = Image.open(image_file).convert('RGB')
                 images.append(img)
                 to_keep.append(True)
             except Exception:
