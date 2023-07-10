@@ -97,6 +97,7 @@ if __name__ == '__main__':
         config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 16
+        workers = 4
     elif os.path.exists("/media/palm/Data/capgen/"):
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
@@ -107,16 +108,18 @@ if __name__ == '__main__':
         detector_weight = ''
         log_output_dir = "/media/palm/Data/capgen/out"
         bs = 1
+        workers = 0
     else:
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
         val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
         src_dir = "/home/palm/data/coco/images"
-        log_output_dir = "out"
+        log_output_dir = "/tmp/out"
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 2
+        workers = 0
     rouge = evaluate.load("rouge")
     bleu = evaluate.load("/home/nhongcha/hf-caption/bleu/bleu.py")
     ignore_pad_token_for_loss = True
@@ -173,7 +176,7 @@ if __name__ == '__main__':
         per_device_eval_batch_size=bs,
         num_train_epochs=12,
         output_dir=log_output_dir,
-        dataloader_num_workers=0,
+        dataloader_num_workers=workers,
         logging_strategy='steps',
         logging_steps=100,
         disable_tqdm=True,
