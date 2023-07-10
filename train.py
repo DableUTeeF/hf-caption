@@ -118,7 +118,7 @@ if __name__ == '__main__':
         detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 2
     rouge = evaluate.load("rouge")
-    bleu = evaluate.load("bleu")
+    bleu = evaluate.load("/home/nhongcha/hf-caption/bleu/bleu.py")
     ignore_pad_token_for_loss = True
 
     config = Config.fromfile(config_file)
