@@ -1,12 +1,12 @@
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = ''
 import torch
-from transformers import ViTImageProcessor, AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
 import nltk
 import evaluate
 import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
-from hf_data import Flickr8KDataset
+from hf_data import Flickr8KDataset, COCOData
 import json
 from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig
 from torch.nn import functional as F
@@ -22,14 +22,12 @@ def tokenization_fn(captions, max_target_length=128):
 
 
 def collate_fn(batch):
-    model_inputs = {'labels': [], 'features': []}
+    model_inputs = {'labels': [], 'pixel_values': []}
     for obj in batch:
         model_inputs['labels'].append(obj[1])
-        image = obj[0]
-        data = torch.load(os.path.join(feature_dir, os.path.basename(image) + '.pth'), map_location='cpu')
-        model_inputs['features'].append(data[f'features[5]'])
+        model_inputs['pixel_values'].append(obj[0])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['features'] = torch.cat(model_inputs['features'])
+    model_inputs['pixel_values'] = torch.stack(model_inputs['pixel_values'])
     return model_inputs
 
 
@@ -54,10 +52,14 @@ def compute_metrics(eval_preds):
     # Some simple post-processing
     decoded_preds, decoded_labels = postprocess_text(decoded_preds,
                                                      decoded_labels)
-    result = metric.compute(predictions=decoded_preds,
-                            references=decoded_labels,
-                            use_stemmer=True)
-    result = {k: round(v * 100, 4) for k, v in result.items()}
+    rouge_result = rouge.compute(predictions=decoded_preds,
+                                 references=decoded_labels,
+                                 use_stemmer=True)
+    result = {k: round(v * 100, 4) for k, v in rouge_result.items()}
+    bleu_result = bleu.compute(predictions=decoded_preds,
+                               references=decoded_labels,
+                               use_stemmer=True)
+    result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     return result
@@ -66,39 +68,41 @@ def compute_metrics(eval_preds):
 if __name__ == '__main__':
     max_per_img = 50
 
-    if os.path.exists("/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"):
-        image_encoder_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"  # "google/vit-base-patch16-224-in21k"
+    if os.path.exists("/project/lt200060-capgen/coco"):
+        vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
-        src_dir = "/project/lt200060-capgen/palm/"
+        src_dir = "/project/lt200060-capgen/coco/images"
+        train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
+        val_json = '/project/lt200060-capgen/coco/annotations/captions_val2017.json'
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
-        feature_dir = '/project/lt200060-capgen/palm/imagecaptioning/features3/dino'
         bs = 16
     elif os.path.exists("/media/palm/Data/capgen/"):
-        image_encoder_model = "google/vit-base-patch16-224-in21k"
+        vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         src_dir = "/media/palm/Data/capgen/"
+        train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
+        val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
         log_output_dir = "/media/palm/Data/capgen/out"
         bs = 1
     else:
-        image_encoder_model = "google/vit-base-patch16-224-in21k"
+        vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
-        src_dir = "/home/palm/data/"
+        train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
+        val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
+        src_dir = "/home/palm/data/coco/images"
         log_output_dir = "out"
         bs = 8
-    metric = evaluate.load("rouge")
+    rouge = evaluate.load("rouge")
+    bleu = evaluate.load("bleu")
     ignore_pad_token_for_loss = True
-    config_path = "config.json"
-    with open(config_path, "r", encoding="utf8") as f:
-        config = json.load(f)
 
     model = CachedFeatureDecoderModel(
         None,
-        DINOPretrained(DINOConfig()),
+        AutoModel.from_pretrained(vit_model),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
-    feature_extractor = ViTImageProcessor.from_pretrained(image_encoder_model)
+    # feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
-    # GPT2 only has bos/eos tokens but not decoder_start/pad tokens
     tokenizer.pad_token = tokenizer.eos_token
 
     # update the model config
@@ -107,24 +111,12 @@ if __name__ == '__main__':
     model.config.pad_token_id = tokenizer.pad_token_id
     output_dir = os.path.join(log_output_dir, "DINOPretrained")
     model.save_pretrained(output_dir)
-    feature_extractor.save_pretrained(output_dir)
+    # feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
-    train_hyperparams = {
-        "batch_size": config["batch_size"]["train"],
-        "shuffle": True,
-        "num_workers": 1,
-        "drop_last": True
-    }
-    valid_hyperparams = {
-        "batch_size": config["batch_size"]["eval"],
-        "shuffle": False,
-        "num_workers": 1,
-        "drop_last": True
-    }
 
-    train_set = Flickr8KDataset(config, src_dir, training=True)
+    train_set = COCOData(train_json, os.path.join(src_dir, 'train2017'), training=True)
     print(len(train_set), flush=True)
-    valid_set = Flickr8KDataset(config, src_dir, training=False)
+    valid_set = COCOData(val_json, os.path.join(src_dir, 'val2017'), training=False)
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
     # valid_loader = DataLoader(valid_set, **valid_hyperparams)
@@ -136,15 +128,15 @@ if __name__ == '__main__':
         per_device_eval_batch_size=bs,
         num_train_epochs=12,
         output_dir=log_output_dir,
-        dataloader_num_workers=1,
+        dataloader_num_workers=0,
         logging_strategy='steps',
         logging_steps=100,
         disable_tqdm=True,
-        report_to=['tensorboard']
+        # report_to=['tensorboard']
     )
     trainer = Seq2SeqTrainer(
         model=model,
-        tokenizer=feature_extractor,
+        # tokenizer=feature_extractor,
         args=training_args,
         compute_metrics=compute_metrics,
         train_dataset=train_set,

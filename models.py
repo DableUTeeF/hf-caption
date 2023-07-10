@@ -8,26 +8,27 @@ import torch
 from transformers.configuration_utils import PretrainedConfig
 from transformers.models.vit.modeling_vit import ViTEmbeddings, ViTEncoder, ViTPooler, ViTConfig
 
+
 class DINOConfig(ViTConfig):
     model_type = "dino"
 
     def __init__(
-        self,
-        hidden_size=256,
-        num_hidden_layers=8,
-        num_attention_heads=8,
-        intermediate_size=3072,
-        hidden_act="gelu",
-        hidden_dropout_prob=0.0,
-        attention_probs_dropout_prob=0.0,
-        initializer_range=0.02,
-        layer_norm_eps=1e-12,
-        image_size=224,
-        patch_size=16,
-        num_channels=3,
-        qkv_bias=True,
-        encoder_stride=16,
-        **kwargs,
+            self,
+            hidden_size=256,
+            num_hidden_layers=8,
+            num_attention_heads=8,
+            intermediate_size=3072,
+            hidden_act="gelu",
+            hidden_dropout_prob=0.0,
+            attention_probs_dropout_prob=0.0,
+            initializer_range=0.02,
+            layer_norm_eps=1e-12,
+            image_size=224,
+            patch_size=16,
+            num_channels=3,
+            qkv_bias=True,
+            encoder_stride=16,
+            **kwargs,
     ):
         super().__init__(**kwargs)
 
@@ -116,7 +117,7 @@ class CachedFeatureConfig(VisionEncoderDecoderConfig):
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
             self,
-            features=None,
+            pixel_values=None,
             decoder_input_ids=None,
             decoder_attention_mask=None,
             encoder_outputs=None,
@@ -135,7 +136,7 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
         if encoder_outputs is None:
-            encoder_outputs = self.encoder(features)
+            encoder_outputs = self.encoder(pixel_values)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
@@ -192,6 +193,7 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             encoder_hidden_states=encoder_outputs.hidden_states,
             encoder_attentions=encoder_outputs.attentions,
         )
+
 
 AutoConfig.register("dino", DINOConfig)
 AutoModel.register(DINOConfig, DINOPretrained)
