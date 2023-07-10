@@ -15,4 +15,4 @@ export _TYPER_STANDARD_TRACEBACK=1
 export TYPER_STANDARD_TRACEBACK=1
 export ACCELERATE_DISABLE_RICH=1
 
-srun python3 train.py
+srun python3 train_mm.py
