@@ -21,8 +21,8 @@ class BaseConfig(ViTConfig):
     def __init__(
             self,
             hidden_size,
-            num_hidden_layers=8,
-            num_attention_heads=8,
+            num_hidden_layers=2,
+            num_attention_heads=2,
             intermediate_size=3072,
             hidden_act="gelu",
             hidden_dropout_prob=0.0,
