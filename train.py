@@ -8,9 +8,9 @@ import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import Flickr8KDataset, COCOData
 import json
-from models import CachedFeatureDecoderModel, DINOPretrained, DINOConfig
-from torch.nn import functional as F
-from transformers.modeling_outputs import BaseModelOutput
+from models import CachedFeatureDecoderModel, DINOPretrained, BaseConfig, get_activation
+from mmengine.config import Config
+from mmdet.apis import init_detector
 
 
 def tokenization_fn(captions, max_target_length=128):
@@ -21,7 +21,26 @@ def tokenization_fn(captions, max_target_length=128):
     return labels
 
 
-def collate_fn(batch):
+@torch.no_grad()
+def mm_collate_fn(batch):
+    model_inputs = {
+        'labels': [],
+        'features': []
+    }
+    for obj in batch:
+        model_inputs['labels'].append(obj[1])
+        data = {
+            'inputs': [obj[0]['inputs']],
+            'data_samples': [obj[0]['data_samples']]
+        }
+        mmmodel.test_step(data)
+        model_inputs['features'].append(mmmodel.hooks['features[5]'])
+    model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
+    model_inputs['features'] = torch.cat(model_inputs['features']).cpu()
+    return model_inputs
+
+
+def std_collate_fn(batch):
     model_inputs = {'labels': [], 'pixel_values': []}
     for obj in batch:
         model_inputs['labels'].append(obj[1])
@@ -75,6 +94,8 @@ if __name__ == '__main__':
         train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
         val_json = '/project/lt200060-capgen/coco/annotations/captions_val2017.json'
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
+        config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
+        detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 16
     elif os.path.exists("/media/palm/Data/capgen/"):
         vit_model = "google/vit-base-patch16-224-in21k"
@@ -82,6 +103,8 @@ if __name__ == '__main__':
         src_dir = "/media/palm/Data/capgen/"
         train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
         val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
+        config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
+        detector_weight = ''
         log_output_dir = "/media/palm/Data/capgen/out"
         bs = 1
     else:
@@ -91,14 +114,26 @@ if __name__ == '__main__':
         val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
         src_dir = "/home/palm/data/coco/images"
         log_output_dir = "out"
-        bs = 8
+        config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
+        detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
+        bs = 2
     rouge = evaluate.load("rouge")
     bleu = evaluate.load("bleu")
     ignore_pad_token_for_loss = True
 
+    config = Config.fromfile(config_file)
+    mmmodel = init_detector(
+        config,
+        detector_weight,
+        device='cuda'
+    )
+    mmmodel.hooks = {}
+    for i in range(len(mmmodel.bbox_head.reg_branches)):
+        mmmodel.bbox_head.reg_branches[i][2].register_forward_hook(get_activation(f'features[{i}]', mmmodel.hooks))
+
     model = CachedFeatureDecoderModel(
         None,
-        AutoModel.from_pretrained(vit_model),
+        DINOPretrained(BaseConfig(hidden_size=256)),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     # feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
@@ -114,9 +149,19 @@ if __name__ == '__main__':
     # feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
-    train_set = COCOData(train_json, os.path.join(src_dir, 'train2017'), training=True)
+    train_set = COCOData(
+        train_json,
+        os.path.join(src_dir, 'train2017'),
+        training=True,
+        config=config_file
+    )
     print(len(train_set), flush=True)
-    valid_set = COCOData(val_json, os.path.join(src_dir, 'val2017'), training=False)
+    valid_set = COCOData(
+        val_json,
+        os.path.join(src_dir, 'val2017'),
+        training=False,
+        config=config_file
+    )
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
     # valid_loader = DataLoader(valid_set, **valid_hyperparams)
@@ -141,6 +186,6 @@ if __name__ == '__main__':
         compute_metrics=compute_metrics,
         train_dataset=train_set,
         eval_dataset=valid_set,
-        data_collator=collate_fn,
+        data_collator=mm_collate_fn,
     )
     trainer.train()

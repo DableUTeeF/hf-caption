@@ -1,14 +1,16 @@
 import os
 import json
 
-import torch
+from mmengine.config import Config
 import torchvision.transforms as transforms
 from torch.utils.data import Dataset
 from PIL import Image
+from mmdet.utils import get_test_pipeline_cfg
+from mmcv.transforms import Compose
 
 
 class COCOData(Dataset):
-    def __init__(self, json_file, src_dir, training=True, transform=True):
+    def __init__(self, json_file, src_dir, training=True, transform=True, config=None):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
@@ -16,19 +18,28 @@ class COCOData(Dataset):
             self.images[image['id']] = image
         self.src_dir = src_dir
         if training and transform:
-            self.transform = transforms.Compose([
-                transforms.RandomResizedCrop(224),
-                transforms.RandomHorizontalFlip(0.5),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
+            if config is not None:
+                config = Config.fromfile(config)
+                # config.test_dataloader.dataset = config.train_dataloader.dataset
+                self.transform = Compose(get_test_pipeline_cfg(config))
+            else:
+                self.transform = transforms.Compose([
+                    transforms.RandomResizedCrop(224),
+                    transforms.RandomHorizontalFlip(0.5),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
         elif transform:
-            self.transform = transforms.Compose([
-                transforms.Resize(224),
-                transforms.CenterCrop(224),
-                transforms.ToTensor(),
-                transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
-            ])
+            if config is not None:
+                config = Config.fromfile(config)
+                self.transform = Compose(get_test_pipeline_cfg(config))
+            else:
+                self.transform = transforms.Compose([
+                    transforms.Resize(224),
+                    transforms.CenterCrop(224),
+                    transforms.ToTensor(),
+                    transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+                ])
         else:
             self.transform = lambda x: x
 
@@ -38,9 +49,9 @@ class COCOData(Dataset):
     def __getitem__(self, index):
         caption = self.captions[index]
         image = self.images[caption['image_id']]
-        image = Image.open(os.path.join(self.src_dir, image['file_name']))
-        image = self.transform(image)
-        return image, caption['caption']
+        data_ = dict(img_path=os.path.join(self.src_dir, image['file_name']), img_id=0)
+        data_ = self.transform(data_)
+        return data_, caption['caption']
 
 
 class Flickr8KDataset(Dataset):
@@ -56,7 +67,8 @@ class Flickr8KDataset(Dataset):
         self._data = self._create_input_label_mappings(self._data)
         self._image_specs = config["image_specs"]["image_dir"]
 
-    def _create_input_label_mappings(self, data):
+    @staticmethod
+    def _create_input_label_mappings(data):
         processed_data = []
         for line in data:
             tokens = line.split()

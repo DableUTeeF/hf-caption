@@ -9,12 +9,18 @@ from transformers.configuration_utils import PretrainedConfig
 from transformers.models.vit.modeling_vit import ViTEmbeddings, ViTEncoder, ViTPooler, ViTConfig
 
 
-class DINOConfig(ViTConfig):
-    model_type = "dino"
+def get_activation(name, activation):
+    def hook(model, input, output):
+        activation[name] = output
+    return hook
+
+
+class BaseConfig(ViTConfig):
+    model_type = "detector"
 
     def __init__(
             self,
-            hidden_size=256,
+            hidden_size,
             num_hidden_layers=8,
             num_attention_heads=8,
             intermediate_size=3072,
@@ -31,7 +37,6 @@ class DINOConfig(ViTConfig):
             **kwargs,
     ):
         super().__init__(**kwargs)
-
         self.hidden_size = hidden_size
         self.num_hidden_layers = num_hidden_layers
         self.num_attention_heads = num_attention_heads
@@ -49,8 +54,8 @@ class DINOConfig(ViTConfig):
 
 
 class DINOPretrained(PreTrainedModel):
-    config_class = DINOConfig
-    base_model_prefix = "dino"
+    config_class = BaseConfig
+    base_model_prefix = "detector"
     main_input_name = "features"
     supports_gradient_checkpointing = False
     _no_split_modules = []
@@ -58,7 +63,7 @@ class DINOPretrained(PreTrainedModel):
     def __init__(
             self,
             config=None,
-            **kwargs
+            **_
     ):
         super().__init__(config)
         self.act = nn.GELU()
@@ -76,7 +81,7 @@ class DINOPretrained(PreTrainedModel):
             return_dict=None,
             output_attentions=None,
             output_hidden_states=None,
-            **kwargs
+            **_
     ):
         output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
         output_hidden_states = (
@@ -108,8 +113,8 @@ class DINOPretrained(PreTrainedModel):
 
 
 class CachedFeatureConfig(VisionEncoderDecoderConfig):
-    def __init__(self, decoder_cfg):
-        self.encoder = DINOConfig()
+    def __init__(self, mmconfig, decoder_cfg):
+        self.encoder = BaseConfig(mmconfig)
         self.decoder = decoder_cfg
         self.is_encoder_decoder = True
 
@@ -117,7 +122,7 @@ class CachedFeatureConfig(VisionEncoderDecoderConfig):
 class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
     def forward(
             self,
-            pixel_values=None,
+            features=None,
             decoder_input_ids=None,
             decoder_attention_mask=None,
             encoder_outputs=None,
@@ -136,7 +141,7 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
             argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
         if encoder_outputs is None:
-            encoder_outputs = self.encoder(pixel_values)
+            encoder_outputs = self.encoder(features)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
@@ -195,5 +200,5 @@ class CachedFeatureDecoderModel(VisionEncoderDecoderModel):
         )
 
 
-AutoConfig.register("dino", DINOConfig)
-AutoModel.register(DINOConfig, DINOPretrained)
+AutoConfig.register("detector", BaseConfig)
+AutoModel.register(BaseConfig, DINOPretrained)
