@@ -15,7 +15,8 @@ def tokenization_fn(captions, max_target_length=120):
     labels = tokenizer(captions,
                        padding="max_length",
                        max_length=max_target_length,
-                       return_tensors="pt").input_ids
+                       return_tensors="pt",
+                       truncation=True).input_ids
 
     return labels
 
@@ -95,10 +96,9 @@ def compute_metrics(eval_preds):
                                  references=decoded_labels,
                                  use_stemmer=True)
     result = {k: round(v * 100, 4) for k, v in rouge_result.items()}
-    bleu_result = bleu.compute(predictions=decoded_preds,
-                               references=decoded_labels,
-                               use_stemmer=True)
-    result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
+    # bleu_result = bleu.compute(predictions=decoded_preds,
+    #                            references=decoded_labels)
+    # result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     return result
@@ -116,6 +116,7 @@ if __name__ == '__main__':
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
         config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
+        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/baseline')
         bs = 16
         workers = 4
     elif os.path.exists("/media/palm/Data/capgen/"):
@@ -153,7 +154,6 @@ if __name__ == '__main__':
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
-    output_dir = os.path.join(log_output_dir, "DINOPretrained")
     model.save_pretrained(output_dir)
     # feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)

@@ -17,7 +17,8 @@ def tokenization_fn(captions, max_target_length=128):
     labels = tokenizer(captions,
                        padding="max_length",
                        max_length=max_target_length,
-                       return_tensors='pt').input_ids
+                       return_tensors='pt',
+                       truncation=True).input_ids
     return labels
 
 
@@ -75,10 +76,9 @@ def compute_metrics(eval_preds):
                                  references=decoded_labels,
                                  use_stemmer=True)
     result = {k: round(v * 100, 4) for k, v in rouge_result.items()}
-    bleu_result = bleu.compute(predictions=decoded_preds,
-                               references=decoded_labels,
-                               use_stemmer=True)
-    result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
+    # bleu_result = bleu.compute(predictions=decoded_preds,
+    #                            references=decoded_labels)
+    # result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     return result
@@ -94,6 +94,7 @@ if __name__ == '__main__':
         train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
         val_json = '/project/lt200060-capgen/coco/annotations/captions_val2017.json'
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
+        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/mm_dino_2x2')
         config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 16
@@ -107,6 +108,7 @@ if __name__ == '__main__':
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = ''
         log_output_dir = "/media/palm/Data/capgen/out"
+        output_dir = os.path.join('/tmp/out/mm_dino_8x8')
         bs = 1
         workers = 0
     else:
@@ -119,6 +121,7 @@ if __name__ == '__main__':
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         bs = 2
+        output_dir = os.path.join('/tmp/out/mm_dino_8x8')
         workers = 0
     rouge = evaluate.load("rouge")
     bleu = evaluate.load("/home/nhongcha/hf-caption/bleu/bleu.py")
@@ -147,7 +150,6 @@ if __name__ == '__main__':
     model.config.eos_token_id = tokenizer.eos_token_id
     model.config.decoder_start_token_id = tokenizer.bos_token_id
     model.config.pad_token_id = tokenizer.pad_token_id
-    output_dir = os.path.join(log_output_dir, "DINOPretrained")
     model.save_pretrained(output_dir)
     # feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
