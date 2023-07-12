@@ -7,6 +7,8 @@ from torch.utils.data import Dataset
 from PIL import Image
 from mmdet.utils import get_test_pipeline_cfg
 from mmcv.transforms import Compose
+from diffusers import DiffusionPipeline
+import torch
 
 
 class COCOData(Dataset):

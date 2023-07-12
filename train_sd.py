@@ -1,73 +1,20 @@
+from diffusers import DiffusionPipeline
 import os
-# os.environ['CUDA_VISIBLE_DEVICES'] = ''
-import torch
-from transformers import AutoFeatureExtractor, AutoTokenizer, VisionEncoderDecoderModel
-import nltk
-import evaluate
-import numpy as np
-from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
-from hf_data import COCOData
 from PIL import Image
+from train_baseline import evaluate, VisionEncoderDecoderModel, AutoFeatureExtractor, AutoTokenizer, COCOData, Seq2SeqTrainingArguments, Seq2SeqTrainer, compute_metrics, tokenization_fn
+import torch
 
 
-def tokenization_fn(captions, max_target_length=120):
-    """Run tokenization on captions."""
-    labels = tokenizer(captions,
-                       padding="max_length",
-                       max_length=max_target_length,
-                       return_tensors="pt",
-                       truncation=True).input_ids
-
-    return labels
-
-
-def feature_extraction_fn(image_paths, check_image=True):
-    """
-    Run feature extraction on images
-    If `check_image` is `True`, the examples that fails during `Image.open()` will be caught and discarded.
-    Otherwise, an exception will be thrown.
-    """
-
+def feature_extraction_fn(image_paths, labels):
     model_inputs = {}
-
-    if check_image:
-        images = []
-        to_keep = []
-        for image_file in image_paths:
-            try:
-                img = Image.open(image_file).convert('RGB')
-                images.append(img)
-                to_keep.append(True)
-            except Exception:
-                to_keep.append(False)
-    else:
+    if torch.rand > 0.5:
         images = [Image.open(image_file) for image_file in image_paths]
+    else:
+        imgs = pipeline(labels)
+        images = imgs[0]
 
     encoder_inputs = feature_extractor(images=images, return_tensors="pt")
-
     return encoder_inputs.pixel_values
-
-
-def preprocess_fn(examples, max_target_length, check_image=True):
-    """Run tokenization + image feature extraction"""
-    image_paths = examples['image_path']
-    captions = examples['caption']
-
-    model_inputs = {}
-    # This contains image path column
-    model_inputs['labels'] = tokenization_fn(captions, max_target_length)
-    model_inputs['pixel_values'] = feature_extraction_fn(image_paths, check_image=check_image)
-
-    return model_inputs
-
-
-def postprocess_text(preds, labels):
-    preds = [pred.strip() for pred in preds]
-    labels = [label.strip() for label in labels]
-    # rougeLSum expects newline after each sentence
-    preds = ["\n".join(nltk.sent_tokenize(pred)) for pred in preds]
-    labels = ["\n".join(nltk.sent_tokenize(label)) for label in labels]
-    return preds, labels
 
 
 def collate_fn(batch):
@@ -75,33 +22,9 @@ def collate_fn(batch):
     for obj in batch:
         model_inputs['labels'].append(obj[1])
         model_inputs['pixel_values'].append(obj[0]['img_path'])
+    model_inputs['pixel_values'] = feature_extraction_fn(model_inputs['pixel_values'], labels=model_inputs['labels'])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['pixel_values'] = feature_extraction_fn(model_inputs['pixel_values'], check_image=True)
     return model_inputs
-
-
-def compute_metrics(eval_preds):
-    preds, labels = eval_preds
-    if isinstance(preds, tuple):
-        preds = preds[0]
-    decoded_preds = tokenizer.batch_decode(preds, skip_special_tokens=True)
-    if ignore_pad_token_for_loss:
-        # Replace -100 in the labels as we can't decode them.
-        labels = np.where(labels != -100, labels, tokenizer.pad_token_id)
-    decoded_labels = tokenizer.batch_decode(labels, skip_special_tokens=True)
-    # Some simple post-processing
-    decoded_preds, decoded_labels = postprocess_text(decoded_preds,
-                                                     decoded_labels)
-    rouge_result = rouge.compute(predictions=decoded_preds,
-                                 references=decoded_labels,
-                                 use_stemmer=True)
-    result = {k: round(v * 100, 4) for k, v in rouge_result.items()}
-    # bleu_result = bleu.compute(predictions=decoded_preds,
-    #                            references=decoded_labels)
-    # result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
-    prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
-    result["gen_len"] = np.mean(prediction_lens)
-    return result
 
 
 if __name__ == '__main__':
@@ -128,7 +51,7 @@ if __name__ == '__main__':
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = ''
         log_output_dir = "/media/palm/Data/capgen/out"
-        output_dir = os.path.join('tmp/baseline')
+        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/baseline')
         bs = 1
         workers = 0
     else:
@@ -140,7 +63,7 @@ if __name__ == '__main__':
         log_output_dir = "/tmp/out"
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
-        output_dir = os.path.join('tmp/baseline')
+        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/baseline')
         bs = 2
         workers = 0
     rouge = evaluate.load("rouge")
@@ -151,6 +74,8 @@ if __name__ == '__main__':
     feature_extractor = AutoFeatureExtractor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     tokenizer.pad_token = tokenizer.eos_token
+    pipeline = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16)
+    pipeline.to("cuda:1")
 
     # update the model config
     model.config.eos_token_id = tokenizer.eos_token_id
