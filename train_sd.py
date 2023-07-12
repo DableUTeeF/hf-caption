@@ -29,6 +29,7 @@ def collate_fn(batch):
 
 if __name__ == '__main__':
     max_per_img = 50
+    output_labels = 'baseline-sd'
 
     if os.path.exists("/project/lt200060-capgen/coco"):
         vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
@@ -39,7 +40,7 @@ if __name__ == '__main__':
         log_output_dir = "/project/lt200060-capgen/palm/hf-captioning/dino-pre-bbox"
         config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
-        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/baseline')
+        output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/', output_labels)
         bs = 16
         workers = 4
     elif os.path.exists("/media/palm/Data/capgen/"):
