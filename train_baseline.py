@@ -1,7 +1,7 @@
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = ''
 import torch
-from transformers import AutoFeatureExtractor, AutoTokenizer, VisionEncoderDecoderModel
+from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
 import nltk
 import evaluate
 import numpy as np
@@ -148,7 +148,7 @@ if __name__ == '__main__':
     ignore_pad_token_for_loss = True
 
     model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(vit_model, text_decode_model)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(vit_model)
+    feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     tokenizer.pad_token = tokenizer.eos_token
 
