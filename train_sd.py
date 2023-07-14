@@ -17,7 +17,7 @@ def tokenization_fn(captions, max_target_length=120):
 def feature_extraction_fn(image_paths, labels):
     model_inputs = {}
     if torch.rand(1).tolist()[0] > 0.5:  # not sure if `tolist` is needed
-        images = [Image.open(image_file) for image_file in image_paths]
+        images = [Image.open(image_file).convert('RGB') for image_file in image_paths]
     else:
         imgs = pipeline(labels)
         images = imgs[0]
