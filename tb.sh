@@ -31,4 +31,4 @@ http://localhost:${port}/
 ------------------------------------------------------------------
 "
 
-tensorboard --logdir /project/lt200060-capgen/palm/hf-captioning/runs/ --port $port --host $node
+tensorboard --logdir ./logs --port $port --host $node
