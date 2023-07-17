@@ -73,6 +73,7 @@ def compute_metrics(eval_preds):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
+    parser.add_argument('featdir', type=str)
     parser.add_argument('--max_per_img', type=int, default=50)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
@@ -81,7 +82,7 @@ if __name__ == '__main__':
     expname = args.expname
     logdir = os.path.join(args.logdir, expname)
     if os.path.exists("/project/lt200060-capgen/coco"):
-        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/dino-1333-test'
+        feature_dir = f'/project/lt200060-capgen/palm/hf-captioning/features/{args.featdir}'
         vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/coco/images"
@@ -94,7 +95,7 @@ if __name__ == '__main__':
         bs = 16
         workers = 0
     elif os.path.exists("/media/palm/Data/capgen/"):
-        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/dino-1333-test'
+        feature_dir = f'/project/lt200060-capgen/palm/hf-captioning/features/{args.featdir}'
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         src_dir = "/media/palm/Data/capgen/"
@@ -107,7 +108,7 @@ if __name__ == '__main__':
         bs = 1
         workers = 0
     else:
-        feature_dir = '/tmp'
+        feature_dir = f'/tmp/{args.featdir}'
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
