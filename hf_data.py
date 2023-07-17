@@ -11,6 +11,24 @@ from diffusers import DiffusionPipeline
 import torch
 
 
+class CachedCOCO(Dataset):
+    def __init__(self, json_file, feat_dir):
+        json_file = json.load(open(json_file))
+        self.captions = json_file['annotations']
+        self.images = {}
+        for image in json_file['images']:
+            self.images[image['id']] = image
+        self.feat_dir = feat_dir
+
+    def __len__(self):
+        return len(self.captions)
+
+    def __getitem__(self, index):
+        caption = self.captions[index]
+        features5 = torch.load(os.path.join(self.feat_dir, caption['image_id']+'.pth'), map_location='cpu')
+        return features5, caption['caption']
+
+
 class COCOData(Dataset):
     def __init__(self, json_file, src_dir, training=True, transform=True, config=None, rescale=True):
         json_file = json.load(open(json_file))

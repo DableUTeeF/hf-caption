@@ -18,7 +18,7 @@ def run(dataset):
         }
         mmmodel.test_step(data)
         feats = mmmodel.hooks['features[5]']
-        torch.save(feats, os.path.join(feature_dir, caption['image_id']+'.pth'))
+        torch.save(feats, os.path.join(feature_dir, f'{caption["image_id"]:010d}.pth'))
 
 
 if __name__ == '__main__':
