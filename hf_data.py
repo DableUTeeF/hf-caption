@@ -25,7 +25,7 @@ class CachedCOCO(Dataset):
 
     def __getitem__(self, index):
         caption = self.captions[index]
-        features5 = torch.load(os.path.join(self.feat_dir, caption['image_id']+'.pth'), map_location='cpu')
+        features5 = torch.load(os.path.join(self.feat_dir, f'{caption["image_id"]:010d}.pth'), map_location='cpu')
         return features5, caption['caption']
 
 
