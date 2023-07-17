@@ -12,7 +12,7 @@ import torch
 
 
 class COCOData(Dataset):
-    def __init__(self, json_file, src_dir, training=True, transform=True, config=None):
+    def __init__(self, json_file, src_dir, training=True, transform=True, config=None, rescale=True):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
@@ -33,8 +33,9 @@ class COCOData(Dataset):
         if training and transform:
             if config is not None:
                 config = Config.fromfile(config)
-                config.train_dataloader.dataset.pipeline[3].transforms[0][0].scales = scales
-                config.train_dataloader.dataset.pipeline[3].transforms[1][2].scales = scales
+                if rescale:
+                    config.train_dataloader.dataset.pipeline[3].transforms[0][0].scales = scales
+                    config.train_dataloader.dataset.pipeline[3].transforms[1][2].scales = scales
                 config.test_dataloader.dataset.pipeline = config.train_dataloader.dataset.pipeline
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
@@ -47,7 +48,8 @@ class COCOData(Dataset):
         elif transform:
             if config is not None:
                 config = Config.fromfile(config)
-                config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
+                if rescale:
+                    config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
                 self.transform = transforms.Compose([
