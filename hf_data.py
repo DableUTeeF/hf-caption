@@ -46,8 +46,8 @@ class COCOData(Dataset):
                 ])
         elif transform:
             if config is not None:
-                config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
                 config = Config.fromfile(config)
+                config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
                 self.transform = transforms.Compose([
