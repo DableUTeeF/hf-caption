@@ -19,10 +19,23 @@ class COCOData(Dataset):
         for image in json_file['images']:
             self.images[image['id']] = image
         self.src_dir = src_dir
+        scales = [
+            (352, 800),
+            (384, 800),
+            (416, 800),
+            (448, 800),
+            (480, 800),
+            (512, 800),
+            (544, 800),
+            (576, 800),
+            (608, 800),
+        ]
         if training and transform:
             if config is not None:
                 config = Config.fromfile(config)
-                # config.test_dataloader.dataset = config.train_dataloader.dataset
+                config.train_dataloader.dataset.pipeline[3].transforms[0][0].scales = scales
+                config.train_dataloader.dataset.pipeline[3].transforms[1][2].scales = scales
+                config.test_dataloader.dataset.pipeline = config.train_dataloader.dataset.pipeline
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
                 self.transform = transforms.Compose([
@@ -33,6 +46,7 @@ class COCOData(Dataset):
                 ])
         elif transform:
             if config is not None:
+                config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
                 config = Config.fromfile(config)
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
@@ -81,7 +95,7 @@ class Flickr8KDataset(Dataset):
             processed_data.append(pair)
 
         return processed_data
-    
+
     def __len__(self):
         return len(self._data)
 

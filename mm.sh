@@ -11,8 +11,11 @@ module purge
 module load Miniconda3/22.11.1-1
 conda activate /project/lt200060-capgen/palm/conda_envs/.conda/envs/palm_caption
 
+#SBATCH --error=slurm_outputs/$SLURM_JOBID.txt
+#SBATCH --output=slurm_outputs/$SLURM_JOBID.txt
+
 export _TYPER_STANDARD_TRACEBACK=1
 export TYPER_STANDARD_TRACEBACK=1
 export ACCELERATE_DISABLE_RICH=1
 
-srun python3 train_mm.py
+srun python3 train_mm.py dino-800x800
