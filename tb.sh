@@ -11,7 +11,7 @@
 
 module purge
 module load Miniconda3/22.11.1-1
-conda activate palm_search
+conda activate /project/lt200060-capgen/palm/conda_envs/.conda/envs/palm_caption
 
 
 port=$(shuf -i 6000-9999 -n 1)
