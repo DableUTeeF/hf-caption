@@ -7,6 +7,9 @@
 #SBATCH -A lt200060                     # Specify project name
 #SBATCH -J cap_train                      # Specify job name
 
+#SBATCH --error=slurm_outputs/%j.out
+#SBATCH --output=slurm_outputs/%j.out
+
 module purge
 module load Miniconda3/22.11.1-1
 conda activate /project/lt200060-capgen/palm/conda_envs/.conda/envs/palm_caption
