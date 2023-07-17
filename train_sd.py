@@ -1,14 +1,23 @@
 from diffusers import DiffusionPipeline
 import os
 from PIL import Image
-from train_baseline import evaluate, VisionEncoderDecoderModel, AutoFeatureExtractor, AutoTokenizer, COCOData, Seq2SeqTrainingArguments, Seq2SeqTrainer, compute_metrics, tokenization_fn
+from train_baseline import evaluate, VisionEncoderDecoderModel, ViTImageProcessor, AutoTokenizer, COCOData, Seq2SeqTrainingArguments, Seq2SeqTrainer, compute_metrics
 import torch
 
+def tokenization_fn(captions, max_target_length=120):
+    """Run tokenization on captions."""
+    labels = tokenizer(captions,
+                       padding="max_length",
+                       max_length=max_target_length,
+                       return_tensors="pt",
+                       truncation=True).input_ids
+
+    return labels
 
 def feature_extraction_fn(image_paths, labels):
     model_inputs = {}
-    if torch.rand > 0.5:
-        images = [Image.open(image_file) for image_file in image_paths]
+    if torch.rand(1).tolist()[0] > 0.5:  # not sure if `tolist` is needed
+        images = [Image.open(image_file).convert('RGB') for image_file in image_paths]
     else:
         imgs = pipeline(labels)
         images = imgs[0]
@@ -32,6 +41,7 @@ if __name__ == '__main__':
     output_labels = 'baseline-sd'
 
     if os.path.exists("/project/lt200060-capgen/coco"):
+        sd_model = "/project/lt200060-capgen/palm/huggingface/stable-diffusion-v1-5"
         vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/coco/images"
@@ -42,7 +52,7 @@ if __name__ == '__main__':
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         output_dir = os.path.join('/project/lt200060-capgen/palm/hf-captioning/', output_labels)
         bs = 16
-        workers = 4
+        workers = 0
     elif os.path.exists("/media/palm/Data/capgen/"):
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
@@ -72,11 +82,11 @@ if __name__ == '__main__':
     ignore_pad_token_for_loss = True
 
     model = VisionEncoderDecoderModel.from_encoder_decoder_pretrained(vit_model, text_decode_model)
-    feature_extractor = AutoFeatureExtractor.from_pretrained(vit_model)
+    feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     tokenizer.pad_token = tokenizer.eos_token
-    pipeline = DiffusionPipeline.from_pretrained("runwayml/stable-diffusion-v1-5", torch_dtype=torch.float16)
-    pipeline.to("cuda:1")
+    pipeline = DiffusionPipeline.from_pretrained(sd_model, torch_dtype=torch.float16)
+    pipeline.to("cuda")
 
     # update the model config
     model.config.eos_token_id = tokenizer.eos_token_id
