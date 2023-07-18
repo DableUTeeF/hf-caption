@@ -32,7 +32,7 @@ if __name__ == '__main__':
 
     for idx, caption in enumerate(captions):
         image_id = caption['image_id']
-        if str(image_id) in finished or idx % div != mod:
+        if idx % div != mod:
             continue
         id = caption['id']
         imgs = pipeline([caption['caption'] for _ in range(num)])[0]
