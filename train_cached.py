@@ -30,8 +30,10 @@ def mm_collate_fn(batch):
         'features': []
     }
     for obj in batch:
-        model_inputs['labels'].append(obj[1])
+        if obj[0].size(2) == 1024 and obj[0].size(1) != 1000:
+            continue
         model_inputs['features'].append(obj[0])
+        model_inputs['labels'].append(obj[1])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
     model_inputs['features'] = torch.cat(model_inputs['features']).cpu()
     return model_inputs
@@ -74,6 +76,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
     parser.add_argument('featdir', type=str)
+    parser.add_argument('hidden_size', type=int)
     parser.add_argument('--max_per_img', type=int, default=50)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
@@ -128,7 +131,7 @@ if __name__ == '__main__':
 
     model = CachedFeatureDecoderModel(
         None,
-        DINOPretrained(BaseConfig(hidden_size=256)),
+        DINOPretrained(BaseConfig(hidden_size=args.hidden_size)),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     # feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
