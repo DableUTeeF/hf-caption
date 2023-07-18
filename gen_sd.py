@@ -34,10 +34,10 @@ if __name__ == '__main__':
         image_id = caption['image_id']
         if str(image_id) in finished or idx % div != mod:
             continue
+        id = caption['id']
         imgs = pipeline([caption['caption'] for _ in range(num)])[0]
         for i in range(num):
             imgs[i].save(
-                os.path.join(dst_dir, f'{image_id}_{i:02d}.png')
+                os.path.join(dst_dir, f'{id:010d}_{i:02d}.png')
             )
         print(mod, idx, len(captions), flush=True)
-

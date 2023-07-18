@@ -123,8 +123,8 @@ if __name__ == '__main__':
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         src_dir = "/media/palm/Data/capgen/"
-        train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
-        val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
+        train_json = '/media/palm/data/coco/annotations/captions_train2017.json'
+        val_json = '/media/palm/data/coco/annotations/captions_val2017.json'
         config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = ''
         log_output_dir = "/media/palm/Data/capgen/out"
