@@ -39,5 +39,5 @@ if __name__ == '__main__':
             imgs[i].save(
                 os.path.join(dst_dir, f'{image_id}_{i:02d}.png')
             )
-        print(idx, len(captions))
+        print(mod, idx, len(captions), flush=True)
 

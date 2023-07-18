@@ -6,6 +6,8 @@
 #SBATCH -t 120:00:00                    # Specify maximum time limit (hour: minute: second)
 #SBATCH -A lt200060                     # Specify project name
 #SBATCH -J cap_train                      # Specify job name
+#SBATCH --error=regen.out
+#SBATCH --output=regen.out
 
 module purge
 module load Miniconda3/22.11.1-1
