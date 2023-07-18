@@ -4,10 +4,22 @@ from diffusers import DiffusionPipeline
 import torch
 import warnings
 warnings.filterwarnings('ignore')
+import argparse
 
 
 if __name__ == '__main__':
-    num = 40
+    parser = argparse.ArgumentParser()
+    parser.add_argument('mod', type=int)
+    parser.add_argument('--div', type=int, default=8)
+    parser.add_argument('--num', type=int, default=40)
+    args = parser.parse_args()
+
+    num = args.num
+    mod = args.mod
+    div = args.div
+
+    finished = [f.split()[-1].split('_')[0] for f in open('finished_sd.txt').read().split('\n')[:-1]]
+
     train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
     src_dir = "/project/lt200060-capgen/coco/images"
     dst_dir = "/project/lt200060-capgen/palm/sd/images"
@@ -20,6 +32,8 @@ if __name__ == '__main__':
 
     for idx, caption in enumerate(captions):
         image_id = caption['image_id']
+        if str(image_id) in finished or idx % div != mod:
+            continue
         imgs = pipeline([caption['caption'] for _ in range(num)])[0]
         for i in range(num):
             imgs[i].save(
