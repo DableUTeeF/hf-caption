@@ -6,62 +6,8 @@ from mmdet.apis import init_detector
 from models import get_activation
 from hf_data import COCOData
 import torch
-from torch import nn
-from mmdet.registry import MODELS
-from mmdet.models.roi_heads.bbox_heads.convfc_bbox_head import Shared2FCBBoxHead
+from torch.nn import functional as F
 
-
-class MidLayer(nn.Module):
-    @staticmethod
-    def forward(self, x):
-        if self.num_shared_convs > 0:
-            for conv in self.shared_convs:
-                x = conv(x)
-
-        if self.num_shared_fcs > 0:
-            if self.with_avg_pool:
-                x = self.avg_pool(x)
-
-            x = x.flatten(1)
-
-            for fc in self.shared_fcs:
-                x = self.relu(fc(x))
-        return x
-
-
-@MODELS.register_module()
-class NewRCNNHead(Shared2FCBBoxHead):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.midlayer = MidLayer()
-
-    def forward(self, x):
-        x = self.midlayer(self, x)
-        # separate branches
-        x_cls = x
-        x_reg = x
-
-        for conv in self.cls_convs:
-            x_cls = conv(x_cls)
-        if x_cls.dim() > 2:
-            if self.with_avg_pool:
-                x_cls = self.avg_pool(x_cls)
-            x_cls = x_cls.flatten(1)
-        for fc in self.cls_fcs:
-            x_cls = self.relu(fc(x_cls))
-
-        for conv in self.reg_convs:
-            x_reg = conv(x_reg)
-        if x_reg.dim() > 2:
-            if self.with_avg_pool:
-                x_reg = self.avg_pool(x_reg)
-            x_reg = x_reg.flatten(1)
-        for fc in self.reg_fcs:
-            x_reg = self.relu(fc(x_reg))
-
-        cls_score = self.fc_cls(x_cls) if self.with_cls else None
-        bbox_pred = self.fc_reg(x_reg) if self.with_reg else None
-        return cls_score, bbox_pred
 
 @torch.no_grad()
 def run(dataset):
@@ -72,42 +18,48 @@ def run(dataset):
             'data_samples': [data['data_samples']]
         }
         mmmodel.test_step(data)
-        feats = mmmodel.hooks['features']
-        torch.save(feats.unsqueeze(0), os.path.join(feature_dir, f'{caption["image_id"]:010d}.pth'))
+        feats = mmmodel.hooks
+        scores, det_labels = F.softmax(feats['cls_features'], dim=-1)[..., :-1].max(-1)
+        scores, bbox_index = scores.topk(50)
+        output = torch.gather(feats['features[6]'], 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
+        torch.save(output, os.path.join(feature_dir, caption['image_id']+'.pth'))
 
 
 if __name__ == '__main__':
     if os.path.exists("/project/lt200060-capgen/coco"):
-        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/rcnn-1333-test'
-        config_file = '/home/nhongcha/mmdetection/configs/faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py'
-        detector_weight = '/project/lt200060-capgen/palm/pretrained/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth'
+        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/dino-800-test-50'
+        config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
+        detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
         val_json = '/project/lt200060-capgen/coco/annotations/captions_val2017.json'
         src_dir = "/project/lt200060-capgen/coco/images"
     else:
         feature_dir = '/tmp'
-        config_file = '/home/palm/PycharmProjects/mmdetection/configs/faster_rcnn/faster-rcnn_r50_fpn_1x_coco.py'
-        detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/faster_rcnn_r50_fpn_1x_coco_20200130-047c8118.pth'
+        config_file = '/home/palm/PycharmProjects/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
+        detector_weight = '/home/palm/PycharmProjects/mmdetection/cp/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
         val_json = '/home/palm/data/coco/annotations/annotations/captions_val2017.json'
         src_dir = "/home/palm/data/coco/images"
 
+    os.makedirs(feature_dir, exist_ok=True)
     config = Config.fromfile(config_file)
-    config.model.roi_head.bbox_head.type = 'NewRCNNHead'
     mmmodel = init_detector(
         config,
         detector_weight,
         device='cuda'
     )
     mmmodel.hooks = {}
-    mmmodel.roi_head.bbox_head.midlayer.register_forward_hook(get_activation('features', mmmodel.hooks))
+    for i in range(len(mmmodel.bbox_head.reg_branches)):
+        mmmodel.bbox_head.reg_branches[i][2].register_forward_hook(get_activation(f'features[{i}]', mmmodel.hooks))
+    mmmodel.bbox_head.reg_branches[-1][3].register_forward_hook(get_activation(f'reg_features', mmmodel.hooks))
+    mmmodel.bbox_head.cls_branches[-1].register_forward_hook(get_activation(f'cls_features', mmmodel.hooks))
 
     train_set = COCOData(
         train_json,
         os.path.join(src_dir, 'train2017'),
         training=False,
         config=config_file,
-        rescale=False
+        rescale=True
     )
     valid_set = COCOData(
         val_json,
