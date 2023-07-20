@@ -12,13 +12,14 @@ if __name__ == '__main__':
     parser.add_argument('mod', type=int)
     parser.add_argument('--div', type=int, default=8)
     parser.add_argument('--num', type=int, default=40)
+    parser.add_argument('--overwrite', action='store_true')
     args = parser.parse_args()
 
     num = args.num
     mod = args.mod
     div = args.div
 
-    finished = [f.split()[-1].split('_')[0] for f in open('finished_sd.txt').read().split('\n')[:-1]]
+    finished = [int(f.split()[1]) for f in open('finished_8-1.out').read().split('\n')[:-1]]
 
     train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
     src_dir = "/project/lt200060-capgen/coco/images"
@@ -33,6 +34,8 @@ if __name__ == '__main__':
     for idx, caption in enumerate(captions):
         image_id = caption['image_id']
         if idx % div != mod:
+            continue
+        if idx in finished and not args.overwrite:
             continue
         id = caption['id']
         imgs = pipeline([caption['caption'] for _ in range(num)])[0]
