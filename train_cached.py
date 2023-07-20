@@ -63,10 +63,9 @@ def compute_metrics(eval_preds):
     rouge_result = rouge.compute(predictions=decoded_preds,
                                  references=decoded_labels,
                                  use_stemmer=True)
-    result = {k: round(v * 100, 4) for k, v in rouge_result.items()}
-    # bleu_result = bleu.compute(predictions=decoded_preds,
-    #                            references=decoded_labels)
-    # result.update({k: round(v * 100, 4) for k, v in bleu_result.items()})
+    bleu_result = bleu.compute(predictions=decoded_preds,
+                               references=decoded_labels)
+    result = {**rouge_result, **bleu_result}
     prediction_lens = [np.count_nonzero(pred != tokenizer.pad_token_id) for pred in preds]
     result["gen_len"] = np.mean(prediction_lens)
     return result
@@ -162,6 +161,8 @@ if __name__ == '__main__':
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
         evaluation_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=1,
         per_device_train_batch_size=bs,
         per_device_eval_batch_size=bs,
         num_train_epochs=12,
