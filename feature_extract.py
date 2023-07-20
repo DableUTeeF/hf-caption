@@ -22,7 +22,7 @@ def run(dataset):
         scores, det_labels = F.softmax(feats['cls_features'], dim=-1)[..., :-1].max(-1)
         scores, bbox_index = scores.topk(50)
         output = torch.gather(feats['features[6]'], 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
-        torch.save(output, os.path.join(feature_dir, caption['image_id']+'.pth'))
+        torch.save(output, os.path.join(feature_dir, f'{caption["image_id"]:09d}.pth'))
 
 
 if __name__ == '__main__':
