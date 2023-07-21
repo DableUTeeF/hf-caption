@@ -1,6 +1,10 @@
 from transformers import ViTImageProcessor, AutoTokenizer, VisionEncoderDecoderModel
 from PIL import Image
 from transformers.generation.utils import *
+from models import get_activation, InterceptedGPT2Attention, DummyATTN
+from matplotlib import pyplot as plt
+import cv2
+import numpy as np
 
 
 def beam_search(
@@ -83,6 +87,7 @@ def beam_search(
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
         )
+        attn_outs.append(self.hooks['_attn'][1])
 
         if synced_gpus and this_peer_finished:
             cur_len = cur_len + 1
@@ -204,14 +209,30 @@ def beam_search(
         return sequence_outputs["sequences"]
 
 
+def plot(attn, img):
+    image = np.array(img, dtype='uint8')
+    heatmapshow = None
+    heatmapshow = cv2.normalize(attn, heatmapshow, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+    heatmapshow = cv2.applyColorMap(heatmapshow, cv2.COLORMAP_JET)
+    super_imposed_img = cv2.addWeighted(cv2.resize(heatmapshow, (image.shape[1], image.shape[0])), 0.5, image, 0.5, 0)
+    plt.axis('off')
+    plt.imshow(super_imposed_img)
+
+
 if __name__ == '__main__':
+    attn_outs = []
+    tokenizer = AutoTokenizer.from_pretrained('gpt2')
     GenerationMixin.beam_search = beam_search
     model = VisionEncoderDecoderModel.from_pretrained("nlpconnect/vit-gpt2-image-captioning")
+    model.decoder.transformer.h[11].crossattention.__class__ = InterceptedGPT2Attention
+    model.decoder.transformer.h[11].crossattention._attn = DummyATTN()
 
-    model.decoder.transformer.h[11].attn
-    model.decoder.transformer.h[11].crossattention
+    model.hooks = {}
+    model.decoder.transformer.h[11].attn.register_forward_hook(get_activation(f'attn', model.hooks))
+    model.decoder.transformer.h[11].crossattention.register_forward_hook(get_activation(f'crossattention', model.hooks))
+    model.decoder.transformer.h[11].crossattention._attn.register_forward_hook(get_activation(f'_attn', model.hooks))
 
-    img = Image.open('/home/palm/data/coco/images/val2017/000000146825.jpg')
+    img = Image.open('/media/palm/data/coco/images/val2017/000000383921.jpg')
     pixel_values = ViTImageProcessor()(images=img, return_tensors="pt").pixel_values  # Batch size 1
 
     beam_scorer = BeamSearchScorer(
@@ -226,6 +247,23 @@ if __name__ == '__main__':
 
     # later
     output_ids = model.generate(
-        pixel_values, max_length=16, num_beams=4, return_dict_in_generate=True
-    ).sequences
+        pixel_values, max_length=16, num_beams=2, return_dict_in_generate=True
+    ).sequences[0]
+    print(tokenizer.decode(output_ids))
+    plt.rcParams['figure.figsize'] = [9, 15]
+    for i in range(len(output_ids)):
+        plt.subplot(len(output_ids), 3, i*3+1)
+        plt.title(tokenizer.decode(output_ids[i]))
+        attn = attn_outs[i].sum(1).sum(1)
+        attn = attn[0][1:].resize(14, 14).cpu().numpy()
+        plot(attn, img)
+        plt.subplot(len(output_ids), 3, i*3+2)
+        attn = attn_outs[i].sum(1).sum(1)
+        attn = attn[1][1:].resize(14, 14).cpu().numpy()
+        plot(attn, img)
+        plt.subplot(len(output_ids), 3, i*3+3)
+        attn = attn_outs[i].sum(1).sum(1)
+        attn = attn.sum(0)[1:].resize(14, 14).cpu().numpy()
+        plot(attn, img)
+    plt.show()
     print()
