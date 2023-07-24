@@ -22,12 +22,12 @@ def run(dataset):
         scores, det_labels = F.softmax(feats['cls_features'], dim=-1)[..., :-1].max(-1)
         scores, bbox_index = scores.topk(50)
         output = torch.gather(feats['features[6]'], 1, bbox_index.unsqueeze(-1).expand(-1, -1, 256))
-        torch.save(output, os.path.join(feature_dir, f'{caption["image_id"]:09d}.pth'))
+        torch.save(mmmodel.hooks['features[5]'], os.path.join(feature_dir, f'{caption["image_id"]:09d}.pth'))
 
 
 if __name__ == '__main__':
     if os.path.exists("/project/lt200060-capgen/coco"):
-        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/dino-800-test-50'
+        feature_dir = '/project/lt200060-capgen/palm/hf-captioning/features/dino-800-test-5'
         config_file = '/home/nhongcha/mmdetection/configs/dino/dino-4scale_r50_8xb2-12e_coco.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/dino-4scale_r50_8xb2-12e_coco_20221202_182705-55b2bba2.pth'
         train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
