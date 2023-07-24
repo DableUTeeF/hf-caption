@@ -108,7 +108,6 @@ if __name__ == '__main__':
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
     args = parser.parse_args()
-    max_per_img = args.max_per_img
     expname = args.expname
     logdir = os.path.join(args.logdir, expname)
     if os.path.exists("/project/lt200060-capgen/coco"):
