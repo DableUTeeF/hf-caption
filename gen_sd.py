@@ -38,6 +38,8 @@ if __name__ == '__main__':
         if idx in finished and not args.overwrite:
             continue
         id = caption['id']
+        if os.path.exists(os.path.join(dst_dir, f'{id:010d}_{num-1:02d}.png')):
+            continue
         imgs = pipeline([caption['caption'] for _ in range(num)])[0]
         for i in range(num):
             imgs[i].save(
