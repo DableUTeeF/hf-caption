@@ -1,17 +1,18 @@
 import os
 # os.environ['CUDA_VISIBLE_DEVICES'] = ''
 import torch
-from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM
+from transformers import AutoModel, AutoTokenizer, AutoModelForCausalLM, ViTImageProcessor
 import nltk
 import evaluate
 import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import CachedCOCO
 import json
-from models import CachedFeatureDecoderModel, DINOPretrained, BaseConfig, get_activation
+from models import CombinedEncoderDecoderModel, DINOPretrained, BaseConfig, get_activation
 from mmengine.config import Config
 from mmdet.apis import init_detector
 import argparse
+from PIL import Image
 
 
 def tokenization_fn(captions, max_target_length=128):
@@ -24,19 +25,41 @@ def tokenization_fn(captions, max_target_length=128):
 
 
 @torch.no_grad()
-def mm_collate_fn(batch):
+def combined_collate_fn(batch):
     model_inputs = {
         'labels': [],
-        'features': []
+        'features': [],
+        'pixel_values': [],
     }
     for obj in batch:
         if obj[0].size(2) == 1024 and obj[0].size(1) != 1000:
             continue
         model_inputs['features'].append(obj[0])
         model_inputs['labels'].append(obj[1])
+        model_inputs['pixel_values'].append(obj[2])
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['features'] = torch.cat(model_inputs['features']).cpu()
+    model_inputs['features'] = torch.cat(model_inputs['features'])
+    model_inputs['pixel_values'] = feature_extraction_fn(model_inputs['pixel_values'], check_image=True)
     return model_inputs
+
+
+@torch.no_grad()
+def feature_extraction_fn(image_paths, check_image=True):
+    if check_image:
+        images = []
+        to_keep = []
+        for image_file in image_paths:
+            try:
+                img = Image.open(image_file).convert('RGB')
+                images.append(img)
+                to_keep.append(True)
+            except Exception:
+                to_keep.append(False)
+    else:
+        images = [Image.open(image_file) for image_file in image_paths]
+
+    encoder_inputs = feature_extractor(images=images, return_tensors="pt")
+    return encoder_inputs.pixel_values
 
 
 def postprocess_text(preds, labels):
@@ -85,7 +108,7 @@ if __name__ == '__main__':
     logdir = os.path.join(args.logdir, expname)
     if os.path.exists("/project/lt200060-capgen/coco"):
         feature_dir = f'/project/lt200060-capgen/palm/hf-captioning/features/{args.featdir}'
-        vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
+        vit_model = "/project/lt200060-capgen/palm/huggingface/vit-large-patch16-384"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/coco/images"
         train_json = '/project/lt200060-capgen/coco/annotations/captions_train2017.json'
@@ -128,12 +151,12 @@ if __name__ == '__main__':
     bleu = evaluate.load(bleu_path)
     ignore_pad_token_for_loss = True
 
-    model = CachedFeatureDecoderModel(
+    model = CombinedEncoderDecoderModel(
         None,
-        DINOPretrained(BaseConfig(hidden_size=args.hidden_size)),
+        AutoModel.from_pretrained(vit_model),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
-    # feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
+    feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)
     tokenizer.pad_token = tokenizer.eos_token
 
@@ -181,6 +204,6 @@ if __name__ == '__main__':
         compute_metrics=compute_metrics,
         train_dataset=train_set,
         eval_dataset=valid_set,
-        data_collator=mm_collate_fn,
+        data_collator=combined_collate_fn,
     )
     trainer.train()

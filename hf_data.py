@@ -12,13 +12,17 @@ import torch
 
 
 class CachedCOCO(Dataset):
-    def __init__(self, json_file, feat_dir):
+    def __init__(self, json_file, feat_dir, src_dir='/project/lt200060-capgen/coco/images', training=True):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
         for image in json_file['images']:
             self.images[image['id']] = image
         self.feat_dir = feat_dir
+        if training:
+            self.src_dir = os.path.join(src_dir, 'train2017')
+        else:
+            self.src_dir = os.path.join(src_dir, 'val2017')
 
     def __len__(self):
         return len(self.captions)
@@ -26,7 +30,8 @@ class CachedCOCO(Dataset):
     def __getitem__(self, index):
         caption = self.captions[index]
         features5 = torch.load(os.path.join(self.feat_dir, f'{caption["image_id"]:09d}.pth'), map_location='cpu')
-        return features5, caption['caption']
+        image = self.images[caption["image_id"]]
+        return features5, caption['caption'], os.path.join(self.src_dir, image['file_name'])
 
 
 class COCOData(Dataset):
@@ -122,3 +127,8 @@ class Flickr8KDataset(Dataset):
     def __getitem__(self, index):
         image, caption = self._data[index]
         return os.path.join(self.src_dir, self._image_specs, image), caption
+
+
+if __name__ == '__main__':
+    s = CachedCOCO('/media/palm/data/coco/annotations/captions_val2017.json', '')
+    s[0]
