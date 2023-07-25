@@ -12,10 +12,14 @@ import torch
 
 
 class CachedCOCO(Dataset):
-    def __init__(self, json_file, feat_dir, src_dir='/project/lt200060-capgen/coco/images', training=True):
+    def __init__(self, json_file, feat_dir, src_dir='/project/lt200060-capgen/coco/images', training=True, digits=10):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
+        if digits > 9:
+            self.digits = f'0{digits}d'
+        else:
+            self.digits = f'{digits}d'
         for image in json_file['images']:
             self.images[image['id']] = image
         self.feat_dir = feat_dir
@@ -29,7 +33,7 @@ class CachedCOCO(Dataset):
 
     def __getitem__(self, index):
         caption = self.captions[index]
-        features5 = torch.load(os.path.join(self.feat_dir, f'{caption["image_id"]:09d}.pth'), map_location='cpu')
+        features5 = torch.load(os.path.join(self.feat_dir, f'{caption["image_id"]:{self.digits}}.pth'), map_location='cpu')
         image = self.images[caption["image_id"]]
         return features5, caption['caption'], os.path.join(self.src_dir, image['file_name'])
 
