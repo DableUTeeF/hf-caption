@@ -107,6 +107,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
     parser.add_argument('encoder', type=str)
+    parser.add_argument('--channel_last', action='store_true')
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
     args = parser.parse_args()
@@ -164,7 +165,7 @@ if __name__ == '__main__':
 
     model = VisionEncoderDecoderModel(
         None,
-        CNNPretrained(BaseConfig(hidden_size=encoder.num_features), encoder),
+        CNNPretrained(BaseConfig(hidden_size=encoder.num_features), encoder, args.channel_last),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(vit_model)

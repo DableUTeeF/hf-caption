@@ -350,12 +350,14 @@ class CNNPretrained(PreTrainedModel):
             self,
             config=None,
             encoder=None,
+            channel_last=False,
             **_
     ):
         super().__init__(config)
         self.act = nn.GELU()
         self.max_per_img = 50
         self.encoder = encoder
+        self.channel_last = channel_last
 
         self.pooler = self.encoder.head.global_pool
         self.post_init()
@@ -363,32 +365,17 @@ class CNNPretrained(PreTrainedModel):
     def forward(
             self,
             pixel_values,
-            output_hidden_states=None,
-            return_dict=None,
             **_
     ):
-        output_hidden_states = (output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states)
-
-        x = self.encoder.stem(pixel_values)
-        x = self.encoder.stages[0](x)
-        x1 = x.view(x.size(0), 256, -1).permute(0, 2, 1)
-        x = self.encoder.stages[1](x)
-        x2 = x.view(x.size(0), 512, -1).permute(0, 2, 1)
-        x = self.encoder.stages[2](x)
-        x3 = x.view(x.size(0), 1024, -1).permute(0, 2, 1)
-        x = self.encoder.stages[3](x)
-        x4 = x.view(x.size(0), 2048, -1).permute(0, 2, 1)
-        if output_hidden_states:
-            hidden_states = (x1, x2, x3, x4)
+        x = self.encoder.forward_features(pixel_values)
+        if self.channel_last:
+            x = x.view(x.size(0), -1, x.size(-1))
         else:
-            hidden_states = None
-        x = self.encoder.norm(x)
-        pooled_output = self.encoder.head.drop(self.pooler(x)).flatten(1)
-        x = x.view(x.size(0), 2048, -1).permute(0, 2, 1)
+            x = x.view(x.size(0), x.size(1), -1)
         return BaseModelOutputWithPooling(
-            last_hidden_state=x,
-            pooler_output=pooled_output,
-            hidden_states=hidden_states,
+            last_hidden_state=x[:, 0],
+            pooler_output=x[:, 0],
+            hidden_states=x,
         )
 
 
