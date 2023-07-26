@@ -502,14 +502,14 @@ class CombinedEncoderDecoderModel(VisionEncoderDecoderModel):
             argument[len("decoder_"):]: value for argument, value in kwargs.items() if argument.startswith("decoder_")
         }
         if encoder_outputs is None:
-            encoder_outputs_vit = self.encoder(
+            encoder_outputs = self.encoder(
                 pixel_values,
                 output_attentions=output_attentions,
                 output_hidden_states=output_hidden_states,
                 return_dict=return_dict,
                 **kwargs_encoder,
             )
-            encoder_outputs = torch.cat((encoder_outputs_vit, features), 1)
+            encoder_outputs.last_hidden_state = torch.cat((encoder_outputs.last_hidden_state, features), 1)
         encoder_hidden_states = encoder_outputs[0]
         # torch.save(encoder_hidden_states, 'encoder_hidden_states.pth')
 
