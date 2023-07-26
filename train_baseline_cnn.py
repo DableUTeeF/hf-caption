@@ -8,7 +8,8 @@ import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import COCOData
 from PIL import Image
-from models import CachedFeatureDecoderModel, ResNetPretrained, BaseConfig
+from models import CachedFeatureDecoderModel, CNNPretrained, BaseConfig
+import timm
 
 
 def tokenization_fn(captions, max_target_length=120):
@@ -105,6 +106,7 @@ def compute_metrics(eval_preds):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
+    parser.add_argument('encoder', type=str)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
     args = parser.parse_args()
@@ -123,6 +125,7 @@ if __name__ == '__main__':
         bleu_path = '/home/nhongcha/hf-caption/bleu/bleu.py'
         bs = 16
         workers = 4
+        pretrained = True
     elif os.path.exists("/media/palm/Data/capgen/"):
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
@@ -136,6 +139,7 @@ if __name__ == '__main__':
         bleu_path = 'bleu'
         bs = 1
         workers = 0
+        pretrained = True
     else:
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
@@ -149,15 +153,18 @@ if __name__ == '__main__':
         bleu_path = 'bleu'
         bs = 2
         workers = 0
+        pretrained = False
     rouge = evaluate.load("rouge")
     bleu = evaluate.load(bleu_path)
     ignore_pad_token_for_loss = True
     os.makedirs(os.path.join(output_dir, 'train'), exist_ok=args.overwrite)
     os.makedirs(logdir, exist_ok=args.overwrite)
 
+    encoder = timm.create_model(args.encoder, pretrained)
+
     model = VisionEncoderDecoderModel(
         None,
-        ResNetPretrained(BaseConfig(hidden_size=2048)),
+        CNNPretrained(BaseConfig(hidden_size=encoder.num_features), encoder),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(vit_model)

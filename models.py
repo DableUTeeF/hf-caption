@@ -9,6 +9,7 @@ from transformers.configuration_utils import PretrainedConfig
 from transformers.models.vit.modeling_vit import ViTEmbeddings, ViTEncoder, ViTPooler, ViTConfig
 from transformers.models.gpt2.modeling_gpt2 import *
 from timm.models.resnetv2 import resnetv2_50
+from timm.models.swin_transformer_v2 import swinv2_base_window8_256
 
 
 class DummyATTN(nn.Module):
@@ -338,7 +339,7 @@ class DINOPretrained(PreTrainedModel):
         )
 
 
-class ResNetPretrained(PreTrainedModel):
+class CNNPretrained(PreTrainedModel):
     config_class = BaseConfig
     base_model_prefix = "detector"
     main_input_name = "pixel_values"
@@ -348,12 +349,13 @@ class ResNetPretrained(PreTrainedModel):
     def __init__(
             self,
             config=None,
+            encoder=None,
             **_
     ):
         super().__init__(config)
         self.act = nn.GELU()
         self.max_per_img = 50
-        self.encoder = resnetv2_50(pretrained=True)
+        self.encoder = encoder
 
         self.pooler = self.encoder.head.global_pool
         self.post_init()
@@ -570,4 +572,4 @@ class CombinedEncoderDecoderModel(VisionEncoderDecoderModel):
 
 AutoConfig.register("detector", BaseConfig)
 AutoModel.register(BaseConfig, DINOPretrained)
-AutoModel.register(BaseConfig, ResNetPretrained)
+AutoModel.register(BaseConfig, CNNPretrained)
