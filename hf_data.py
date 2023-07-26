@@ -39,7 +39,7 @@ class CachedCOCO(Dataset):
 
 
 class COCOData(Dataset):
-    def __init__(self, json_file, src_dir, training=True, transform=True, config=None, rescale=True):
+    def __init__(self, json_file, src_dir, training=True, transform=True, config=None, rescale=True, forced_crop=False):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
@@ -75,7 +75,10 @@ class COCOData(Dataset):
         elif transform:
             if config is not None:
                 config = Config.fromfile(config)
-                if rescale:
+                if forced_crop:
+                    config.test_dataloader.dataset.pipeline[1].scale = (800, 800)
+                    config.test_dataloader.dataset.pipeline[1].keep_ratio = False
+                elif rescale:
                     config.test_dataloader.dataset.pipeline[1].scale = (800, 480)
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
