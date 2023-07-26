@@ -16,4 +16,6 @@
 | 373257 | ResNet, baseline                  | .414695 | 0.095   | (49, 2048)   | 16    |
 | 373420 | baseline-large                    |         |         | (577, 1024)  | 16    |
 | 374944 | vit-large + rcnn-1333             |         |         | (1577, 1024) | 16    |
-| 374967 | ResNet, baseline                  |         |         | (49, 1024)   | 16    |
+| 374967 | Swin, baseline                    |         |         | (49, 1024)   | 16    |
+| 374967 | Focalnet, baseline                |         |         | (49, 1024)   | 16    |
+| 374967 | ResNet, baseline2                 |         |         | (49, 1024)   | 16    |

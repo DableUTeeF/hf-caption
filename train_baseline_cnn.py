@@ -166,7 +166,7 @@ if __name__ == '__main__':
     model = VisionEncoderDecoderModel(
         None,
         CNNPretrained(BaseConfig(hidden_size=encoder.num_features), encoder, args.channel_last),
-        AutoModelForCausalLM.from_pretrained(text_decode_model)
+        AutoModelForCausalLM.from_pretrained(text_decode_model, add_cross_attention=True)
     )
     feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
     tokenizer = AutoTokenizer.from_pretrained(text_decode_model)

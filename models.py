@@ -371,10 +371,10 @@ class CNNPretrained(PreTrainedModel):
         if self.channel_last:
             x = x.view(x.size(0), -1, x.size(-1))
         else:
-            x = x.view(x.size(0), x.size(1), -1)
+            x = x.view(x.size(0), x.size(1), -1).permute(0, 2, 1)
         return BaseModelOutputWithPooling(
-            last_hidden_state=x[:, 0],
-            pooler_output=x[:, 0],
+            last_hidden_state=x,
+            pooler_output=x,
             hidden_states=x,
         )
 
