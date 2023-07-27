@@ -18,7 +18,7 @@ def run(dataset):
         }
         mmmodel.test_step(data)
         bbl = {'backbone': mmmodel.hooks['backbone'], 'features[5]': mmmodel.hooks['features[5]']}
-        torch.save(bbl, os.path.join(feature_dir, caption['image_id']+'.pth'))
+        torch.save(bbl, os.path.join(feature_dir, f'{caption["image_id"]:09d}.pth'))
 
 
 if __name__ == '__main__':
