@@ -182,6 +182,8 @@ if __name__ == '__main__':
     training_args = Seq2SeqTrainingArguments(
         predict_with_generate=True,
         evaluation_strategy="epoch",
+        save_strategy="epoch",
+        save_total_limit=1,
         per_device_train_batch_size=bs,
         per_device_eval_batch_size=bs,
         num_train_epochs=12,
