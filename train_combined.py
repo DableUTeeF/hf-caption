@@ -57,12 +57,7 @@ def feature_extraction_fn(image_paths, check_image=True):
                 to_keep.append(False)
     else:
         images = [Image.open(image_file) for image_file in image_paths]
-    try:
-        encoder_inputs = feature_extractor(images=images, return_tensors="pt")
-    except IndexError as e:
-        print(image_paths)
-        print(images)
-        raise IndexError(e)
+    encoder_inputs = feature_extractor(images=images, return_tensors="pt")
     return encoder_inputs.pixel_values
 
 
@@ -175,13 +170,14 @@ if __name__ == '__main__':
     train_set = CachedCOCO(
         train_json,
         feature_dir,
+        training=True
     )
     print(len(train_set), flush=True)
     valid_set = CachedCOCO(
         val_json,
         feature_dir,
+        training=False
     )
-    train_set = valid_set
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
     # valid_loader = DataLoader(valid_set, **valid_hyperparams)
