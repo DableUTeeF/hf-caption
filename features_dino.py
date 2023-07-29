@@ -12,6 +12,8 @@ import torch
 def run(dataset):
     for idx, (data, _) in enumerate(dataset):
         caption = dataset.captions[idx]
+        if f'{caption["image_id"]:09d}.pth' in os.listdir(feature_dir):
+            continue
         data = {
             'inputs': [data['inputs']],
             'data_samples': [data['data_samples']]
