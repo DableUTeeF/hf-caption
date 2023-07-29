@@ -15,6 +15,7 @@ def run(dataset):
         if f'{caption["image_id"]:09d}.pth' in os.listdir(feature_dir):
             try:
                 torch.load(os.path.join(feature_dir, f'{caption["image_id"]:09d}.pth'))
+                print('skipped', f'{caption["image_id"]:09d}.pth', flush=True)
                 continue
             except:
                 pass
