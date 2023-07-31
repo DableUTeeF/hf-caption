@@ -152,11 +152,13 @@ if __name__ == '__main__':
     train_set = CachedCOCO(
         train_json,
         feature_dir,
+        digits=9
     )
     print(len(train_set), flush=True)
     valid_set = CachedCOCO(
         val_json,
         feature_dir,
+        digits=9
     )
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
