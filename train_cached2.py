@@ -6,7 +6,7 @@ import nltk
 import evaluate
 import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
-from hf_data import Flickr8KDataset, COCOData
+from hf_data import CachedCOCO
 import json
 from models import CachedFeatureDecoderModel, DINOPretrained, BaseConfig, get_activation
 from mmengine.config import Config
@@ -30,25 +30,15 @@ def mm_collate_fn(batch):
         'features': []
     }
     for obj in batch:
+        if obj[0].size(2) == 1024 and obj[0].size(1) != 1000:
+            continue
+        if args.mode == 'backbone':
+            model_inputs['features'].append(obj[0]['backbone'].reshape(1, 1536, 25*25).permute(0, 2, 1))
+        else:
+            model_inputs['features'].append(obj[0]['features[5]'])
         model_inputs['labels'].append(obj[1])
-        data = {
-            'inputs': [obj[0]['inputs']],
-            'data_samples': [obj[0]['data_samples']]
-        }
-        mmmodel.test_step(data)
-        model_inputs['features'].append(mmmodel.hooks['backbone'].permute(0, 2, 3, 1).reshape(1, 25*25, 1536))
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
     model_inputs['features'] = torch.cat(model_inputs['features']).cpu()
-    return model_inputs
-
-
-def std_collate_fn(batch):
-    model_inputs = {'labels': [], 'pixel_values': []}
-    for obj in batch:
-        model_inputs['labels'].append(obj[1])
-        model_inputs['pixel_values'].append(obj[0])
-    model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
-    model_inputs['pixel_values'] = torch.stack(model_inputs['pixel_values'])
     return model_inputs
 
 
@@ -87,6 +77,9 @@ def compute_metrics(eval_preds):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
+    parser.add_argument('featdir', type=str)
+    parser.add_argument('hidden_size', type=int)
+    parser.add_argument('mode', type=str)
     parser.add_argument('--max_per_img', type=int, default=50)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
@@ -95,6 +88,7 @@ if __name__ == '__main__':
     expname = args.expname
     logdir = os.path.join(args.logdir, expname)
     if os.path.exists("/project/lt200060-capgen/coco"):
+        feature_dir = f'/project/lt200060-capgen/palm/hf-captioning/features/{args.featdir}'
         vit_model = "/project/lt200060-capgen/palm/huggingface/vit-base-patch16-224-in21k"
         text_decode_model = "/project/lt200060-capgen/palm/huggingface/gpt2"
         src_dir = "/project/lt200060-capgen/coco/images"
@@ -107,6 +101,7 @@ if __name__ == '__main__':
         bs = 16
         workers = 0
     elif os.path.exists("/media/palm/Data/capgen/"):
+        feature_dir = f'/project/lt200060-capgen/palm/hf-captioning/features/{args.featdir}'
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         src_dir = "/media/palm/Data/capgen/"
@@ -119,6 +114,7 @@ if __name__ == '__main__':
         bs = 1
         workers = 0
     else:
+        feature_dir = f'/tmp/{args.featdir}'
         vit_model = "google/vit-base-patch16-224-in21k"
         text_decode_model = "gpt2"
         train_json = '/home/palm/data/coco/annotations/annotations/captions_train2017.json'
@@ -136,19 +132,9 @@ if __name__ == '__main__':
     bleu = evaluate.load(bleu_path)
     ignore_pad_token_for_loss = True
 
-    config = Config.fromfile(config_file)
-    mmmodel = init_detector(
-        config,
-        detector_weight,
-        device='cuda'
-    )
-    mmmodel.hooks = {}
-    for i in range(len(mmmodel.bbox_head.reg_branches)):
-        mmmodel.bbox_head.reg_branches[i][2].register_forward_hook(get_activation(f'features[{i}]', mmmodel.hooks))
-
     model = CachedFeatureDecoderModel(
         None,
-        DINOPretrained(BaseConfig(hidden_size=256)),
+        DINOPretrained(BaseConfig(hidden_size=args.hidden_size)),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
     )
     # feature_extractor = ViTImageProcessor.from_pretrained(vit_model)
@@ -163,18 +149,14 @@ if __name__ == '__main__':
     # feature_extractor.save_pretrained(output_dir)
     tokenizer.save_pretrained(output_dir)
 
-    train_set = COCOData(
+    train_set = CachedCOCO(
         train_json,
-        os.path.join(src_dir, 'train2017'),
-        training=True,
-        config=config_file
+        feature_dir,
     )
     print(len(train_set), flush=True)
-    valid_set = COCOData(
+    valid_set = CachedCOCO(
         val_json,
-        os.path.join(src_dir, 'val2017'),
-        training=False,
-        config=config_file
+        feature_dir,
     )
     print(len(valid_set), flush=True)
     # train_loader = DataLoader(train_set, **train_hyperparams)
