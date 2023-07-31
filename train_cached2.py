@@ -30,8 +30,6 @@ def mm_collate_fn(batch):
         'features': []
     }
     for obj in batch:
-        if obj[0].size(2) == 1024 and obj[0].size(1) != 1000:
-            continue
         if args.mode == 'backbone':
             model_inputs['features'].append(obj[0]['backbone'].reshape(1, 1536, 25*25).permute(0, 2, 1))
         else:
