@@ -16,10 +16,7 @@ class CachedCOCO(Dataset):
         json_file = json.load(open(json_file))
         self.captions = json_file['annotations']
         self.images = {}
-        if digits > 9:
-            self.digits = f'0{digits}d'
-        else:
-            self.digits = f'{digits}d'
+        self.digits = f'0{digits}d'
         for image in json_file['images']:
             self.images[image['id']] = image
         self.feat_dir = feat_dir
