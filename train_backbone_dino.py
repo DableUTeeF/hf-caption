@@ -8,7 +8,7 @@ import numpy as np
 from transformers import Seq2SeqTrainer, Seq2SeqTrainingArguments
 from hf_data import CachedCOCO
 import json
-from models import CachedFeatureDecoderModel, BackboneDINOPretrained, BaseConfig, get_activation
+from models import BackboneDINOEncoderDecoderModel, BackboneDINOPretrained, BaseConfig, get_activation
 from mmengine.config import Config
 from mmdet.apis import init_detector
 import argparse
@@ -77,7 +77,6 @@ if __name__ == '__main__':
     parser.add_argument('expname', type=str)
     parser.add_argument('featdir', type=str)
     parser.add_argument('hidden_size', type=int)
-    parser.add_argument('mode', type=str)
     parser.add_argument('--max_per_img', type=int, default=50)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
@@ -130,7 +129,7 @@ if __name__ == '__main__':
     bleu = evaluate.load(bleu_path)
     ignore_pad_token_for_loss = True
 
-    model = CachedFeatureDecoderModel(
+    model = BackboneDINOEncoderDecoderModel(
         None,
         BackboneDINOPretrained(BaseConfig(hidden_size=args.hidden_size)),
         AutoModelForCausalLM.from_pretrained(text_decode_model)
