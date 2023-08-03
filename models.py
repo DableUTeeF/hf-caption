@@ -342,7 +342,7 @@ class DINOPretrained(PreTrainedModel):
 class CNNPretrained(PreTrainedModel):
     config_class = BaseConfig
     base_model_prefix = "detector"
-    main_input_name = "pixel_values"
+    main_input_name = "features"
     supports_gradient_checkpointing = False
     _no_split_modules = []
 
@@ -376,6 +376,81 @@ class CNNPretrained(PreTrainedModel):
             last_hidden_state=x,
             pooler_output=x,
             hidden_states=x,
+        )
+
+
+class BackboneDINOPretrained(PreTrainedModel):
+    config_class = BaseConfig
+    base_model_prefix = "detector"
+    main_input_name = "features_bb"
+    supports_gradient_checkpointing = False
+    _no_split_modules = []
+
+    def __init__(
+            self,
+            config=None,
+            backbone_dims=1536,
+            detector_dims=256,
+            **_
+    ):
+        super().__init__(config)
+        self.act = nn.GELU()
+        self.max_per_img = 50
+        self.embeddings = ViTEmbeddings(config, use_mask_token=False)
+        self.encoder = ViTEncoder(config)
+        self.proj = nn.Sequential(
+            nn.Conv1d(256, 512, 7, 2),
+            nn.BatchNorm1d(512),
+            nn.GELU(),
+            nn.Conv1d(512, 1024, 7, 2),
+            nn.BatchNorm1d(1024),
+            nn.GELU(),
+            nn.Conv1d(1024, 1536, 7, 2),
+            nn.BatchNorm1d(1536),
+            nn.GELU(),
+        )
+
+        self.layernorm = nn.LayerNorm(config.hidden_size, eps=config.layer_norm_eps)
+        self.pooler = ViTPooler(config)
+        self.post_init()
+
+    def forward(
+            self,
+            features_bb,
+            features_dd,
+            return_dict=None,
+            output_attentions=None,
+            output_hidden_states=None,
+            **_
+    ):
+        output_attentions = output_attentions if output_attentions is not None else self.config.output_attentions
+        output_hidden_states = (
+            output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
+        )
+        return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        head_mask = self.get_head_mask(None, self.config.num_hidden_layers)
+        features_dd = self.proj(features_dd.permute(0, 2, 1)).permute(0, 2, 1)
+        features = torch.cat((features_bb, features_dd), 1)
+        encoder_outputs = self.encoder(
+            features,
+            head_mask=head_mask,
+            output_attentions=output_attentions,
+            output_hidden_states=output_hidden_states,
+            return_dict=return_dict,
+        )
+        sequence_output = encoder_outputs[0]
+        sequence_output = self.layernorm(sequence_output)
+        pooled_output = self.pooler(sequence_output) if self.pooler is not None else None
+
+        if not return_dict:
+            head_outputs = (sequence_output, pooled_output) if pooled_output is not None else (sequence_output,)
+            return head_outputs + encoder_outputs[1:]
+
+        return BaseModelOutputWithPooling(
+            last_hidden_state=sequence_output,
+            pooler_output=pooled_output,
+            hidden_states=encoder_outputs.hidden_states,
+            attentions=encoder_outputs.attentions,
         )
 
 
