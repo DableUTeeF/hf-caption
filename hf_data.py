@@ -38,6 +38,7 @@ class CachedCOCO(Dataset):
 class COCOData(Dataset):
     def __init__(self, json_file, src_dir, training=True, transform=True, config=None, rescale=True, forced_crop=False):
         json_file = json.load(open(json_file))
+        self.config = config
         self.captions = json_file['annotations']
         self.images = {}
         for image in json_file['images']:
@@ -64,7 +65,7 @@ class COCOData(Dataset):
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
                 self.transform = transforms.Compose([
-                    transforms.RandomResizedCrop(224),
+                    transforms.RandomResizedCrop(800),
                     transforms.RandomHorizontalFlip(0.5),
                     transforms.ToTensor(),
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
@@ -80,8 +81,8 @@ class COCOData(Dataset):
                 self.transform = Compose(get_test_pipeline_cfg(config))
             else:
                 self.transform = transforms.Compose([
-                    transforms.Resize(224),
-                    transforms.CenterCrop(224),
+                    transforms.Resize(960),
+                    transforms.CenterCrop(800),
                     transforms.ToTensor(),
                     transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
                 ])
@@ -94,7 +95,10 @@ class COCOData(Dataset):
     def __getitem__(self, index):
         caption = self.captions[index]
         image = self.images[caption['image_id']]
-        data_ = dict(img_path=os.path.join(self.src_dir, image['file_name']), img_id=0)
+        if self.config is not None:
+            data_ = dict(img_path=os.path.join(self.src_dir, image['file_name']), img_id=0)
+        else:
+            data_ = Image.open(os.path.join(self.src_dir, image['file_name']))
         data_ = self.transform(data_)
         return data_, caption['caption']
 
