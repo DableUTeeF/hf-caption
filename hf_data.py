@@ -98,7 +98,7 @@ class COCOData(Dataset):
         if self.config is not None:
             data_ = dict(img_path=os.path.join(self.src_dir, image['file_name']), img_id=0)
         else:
-            data_ = Image.open(os.path.join(self.src_dir, image['file_name']))
+            data_ = Image.open(os.path.join(self.src_dir, image['file_name'])).convert('RGB')
         data_ = self.transform(data_)
         return data_, caption['caption']
 
