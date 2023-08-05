@@ -13,6 +13,12 @@ from mmengine.config import Config
 from mmdet.apis import init_detector
 import argparse
 
+t = torch.cuda.get_device_properties(0).total_memory
+r = torch.cuda.memory_reserved(0)
+a = torch.cuda.memory_allocated(0)
+f = r-a  # free inside reserved
+print(f, flush=True)
+
 
 def tokenization_fn(captions, max_target_length=128):
     labels = tokenizer(captions,
