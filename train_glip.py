@@ -33,7 +33,7 @@ def mm_collate_fn(batch):
         model_inputs['labels'].append(obj[1])
         data = obj[0]
         feats = mmmodel.extract_feat(data.unsqueeze(0).cuda())
-        feats = torch.cat([f.reshape(1, 256, -1) for f in feats], 2).permute(0, 2, 1)
+        feats = torch.cat([f.reshape(1, 256, -1) for f in feats[:2]], 2).permute(0, 2, 1)
         model_inputs['features'].append(feats)
     model_inputs['labels'] = tokenization_fn(model_inputs['labels'])
     model_inputs['features'] = torch.cat(model_inputs['features']).cpu()
