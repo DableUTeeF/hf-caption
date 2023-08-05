@@ -86,6 +86,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('expname', type=str)
     parser.add_argument('--max_per_img', type=int, default=50)
+    parser.add_argument('--bs', type=int, default=16)
     parser.add_argument('--overwrite', action='store_true')
     parser.add_argument('--logdir', type=str, default='./logs')
     args = parser.parse_args()
@@ -102,7 +103,7 @@ if __name__ == '__main__':
         config_file = '/home/nhongcha/mmdetection/configs/glip/glip_atss_swin-l_fpn_dyhead_pretrain_mixeddata.py'
         detector_weight = '/project/lt200060-capgen/palm/pretrained/glip_l_mmdet-abfe026b.pth'
         bleu_path = '/home/nhongcha/hf-caption/bleu/bleu.py'
-        bs = 16
+        bs = args.bs
         workers = 0
     elif os.path.exists("/media/palm/Data/capgen/"):
         vit_model = "google/vit-base-patch16-224-in21k"
