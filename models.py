@@ -12,6 +12,10 @@ from timm.models.resnetv2 import resnetv2_50
 from timm.models.swin_transformer_v2 import swinv2_base_window8_256
 
 
+class DummyLayer(nn.Module):
+    def forward(self, x):
+        return x
+
 class DummyATTN(nn.Module):
     @staticmethod
     def forward(self, query, key, value, attention_mask=None, head_mask=None):
